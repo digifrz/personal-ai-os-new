@@ -1,0 +1,432 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and settings",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "bio": { "type": "string" },
+        "username": { "type": "string" },
+        "theme": { "type": "string", "enum": ["dark", "light", "system"] },
+        "accentColor": { "type": "string" },
+        "compactMode": { "type": "boolean" },
+        "aiModel": { "type": "string" },
+        "aiBehavior": { "type": "string" },
+        "aiMemoryEnabled": { "type": "boolean" },
+        "emailNotifications": { "type": "boolean" },
+        "pushNotifications": { "type": "boolean" },
+        "taskReminders": { "type": "boolean" },
+        "calendarReminders": { "type": "boolean" },
+        "timezone": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "email"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Task management item",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "in_progress", "done", "trashed"] },
+        "priority": { "type": "string", "enum": ["high", "medium", "low"] },
+        "category": { "type": "string" },
+        "dueAt": { "type": "string" },
+        "projectId": { "type": "string" },
+        "subtasks": { "type": "array" },
+        "tags": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "status"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "User note with markdown content and metadata",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "category": { "type": "string" },
+        "color": { "type": "string" },
+        "tags": { "type": "array" },
+        "attachments": { "type": "array" },
+        "targetAt": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "isArchived": { "type": "boolean" },
+        "isTrashed": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title"]
+    },
+    "FileMetadata": {
+      "title": "FileMetadata",
+      "description": "Storage file and folder metadata",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "itemType": { "type": "string", "enum": ["file", "folder"] },
+        "storagePath": { "type": "string" },
+        "downloadUrl": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "sizeBytes": { "type": "number" },
+        "folderId": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "isArchived": { "type": "boolean" },
+        "isTrashed": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "name", "itemType"]
+    },
+    "CalendarEvent": {
+      "title": "CalendarEvent",
+      "description": "Scheduled event or reminder",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "startsAt": { "type": "string" },
+        "endsAt": { "type": "string" },
+        "allDay": { "type": "boolean" },
+        "timezone": { "type": "string" },
+        "location": { "type": "string" },
+        "reminderMinutes": { "type": "number" },
+        "recurrenceRule": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "startsAt"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "Strategic long-term goal",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "deadline": { "type": "string" },
+        "progress": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title"]
+    },
+    "Milestone": {
+      "title": "Milestone",
+      "description": "Milestone associated with a goal or project",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "goalId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "position": { "type": "number" }
+      },
+      "required": ["userId", "title"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Workspace project module",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string" },
+        "progress": { "type": "number" },
+        "deadline": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "name"]
+    },
+    "LearningSubject": {
+      "title": "LearningSubject",
+      "description": "Subject studied by the user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "progress": { "type": "number" },
+        "color": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "name"]
+    },
+    "LearningFlashcard": {
+      "title": "LearningFlashcard",
+      "description": "Study flashcard",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "front": { "type": "string" },
+        "back": { "type": "string" },
+        "dueAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "front", "back"]
+    },
+    "StudySession": {
+      "title": "StudySession",
+      "description": "Focused learning session entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "minutes": { "type": "number" },
+        "sessionType": { "type": "string" },
+        "startedAt": { "type": "string" },
+        "endedAt": { "type": "string" }
+      },
+      "required": ["userId", "minutes", "startedAt"]
+    },
+    "AIMemory": {
+      "title": "AIMemory",
+      "description": "Personal context memory for AI",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "source": { "type": "string" },
+        "importance": { "type": "number" },
+        "isVisible": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "content"]
+    },
+    "AIConversation": {
+      "title": "AIConversation",
+      "description": "Saved AI conversation session",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "mode": { "type": "string" },
+        "messages": { "type": "array" },
+        "isPinned": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or workspace notification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "sourceId": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "readAt": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "title"]
+    },
+    "CommunityPost": {
+      "title": "CommunityPost",
+      "description": "Public or followers post in The Lounge",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "authorUsername": { "type": "string" },
+        "content": { "type": "string" },
+        "attachments": { "type": "array" },
+        "visibility": { "type": "string" },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "content"]
+    },
+    "CommunityComment": {
+      "title": "CommunityComment",
+      "description": "Comment on a community post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "authorUsername": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["postId", "userId", "content"]
+    },
+    "CommunityChannel": {
+      "title": "CommunityChannel",
+      "description": "Public chat room channel",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "slug": { "type": "string" },
+        "icon": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["name", "slug"]
+    },
+    "CommunityMessage": {
+      "title": "CommunityMessage",
+      "description": "Message sent in a public room",
+      "type": "object",
+      "properties": {
+        "channelId": { "type": "string" },
+        "userId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["channelId", "userId", "content"]
+    },
+    "SchemaMigration": {
+      "title": "SchemaMigration",
+      "description": "Tracks executed database schema migrations",
+      "type": "object",
+      "properties": {
+        "version": { "type": "string" },
+        "name": { "type": "string" },
+        "appliedAt": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["version", "name", "appliedAt"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "User activity audit log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "entityType": { "type": "string" },
+        "entityTitle": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["userId", "action"]
+    },
+    "AIChat": {
+      "title": "AIChat",
+      "description": "Direct message in AI Assistant copilot",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "model"] },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "role", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile and preferences"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Workspace tasks"
+    },
+    "/notes/{noteId}": {
+      "schema": "Note",
+      "description": "Workspace notes"
+    },
+    "/files/{fileId}": {
+      "schema": "FileMetadata",
+      "description": "Uploaded file metadata"
+    },
+    "/calendar_events/{eventId}": {
+      "schema": "CalendarEvent",
+      "description": "Calendar events"
+    },
+    "/goals/{goalId}": {
+      "schema": "Goal",
+      "description": "Goals"
+    },
+    "/milestones/{milestoneId}": {
+      "schema": "Milestone",
+      "description": "Milestones"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Projects"
+    },
+    "/learning_subjects/{subjectId}": {
+      "schema": "LearningSubject",
+      "description": "Learning subjects"
+    },
+    "/learning_flashcards/{cardId}": {
+      "schema": "LearningFlashcard",
+      "description": "Flashcards"
+    },
+    "/study_sessions/{sessionId}": {
+      "schema": "StudySession",
+      "description": "Study sessions"
+    },
+    "/ai_memories/{memoryId}": {
+      "schema": "AIMemory",
+      "description": "AI memories"
+    },
+    "/ai_conversations/{conversationId}": {
+      "schema": "AIConversation",
+      "description": "AI conversation history"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Notifications"
+    },
+    "/community_posts/{postId}": {
+      "schema": "CommunityPost",
+      "description": "Community posts in The Lounge"
+    },
+    "/community_post_comments/{commentId}": {
+      "schema": "CommunityComment",
+      "description": "Comments on community posts"
+    },
+    "/community_channels/{channelId}": {
+      "schema": "CommunityChannel",
+      "description": "Public chat rooms"
+    },
+    "/community_messages/{messageId}": {
+      "schema": "CommunityMessage",
+      "description": "Chat messages in public rooms"
+    },
+    "/schema_migrations/{migrationId}": {
+      "schema": "SchemaMigration",
+      "description": "Database schema migration records"
+    },
+    "/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Activity history log records"
+    },
+    "/ai_chats/{chatId}": {
+      "schema": "AIChat",
+      "description": "AI assistant chat messages"
+    }
+  }
+}

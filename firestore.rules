@@ -1,0 +1,186 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profile and settings
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isOwner(userId);
+    }
+
+    // Owner-scoped workspace collections
+    match /tasks/{taskId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /notes/{noteId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /files/{fileId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /calendar_events/{eventId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /goals/{goalId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /milestones/{milestoneId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /projects/{projectId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /learning_subjects/{subjectId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /learning_flashcards/{cardId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /study_sessions/{sessionId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /ai_memories/{memoryId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /ai_conversations/{conversationId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /activity_logs/{logId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /ai_chats/{chatId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /system/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Community The Lounge collections
+    match /community_posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'commentsCount', 'savedBy']));
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /community_post_comments/{commentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /community_channels/{channelId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /community_messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /community_threads/{threadId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
+    }
+
+    match /community_thread_messages/{messageId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /community_stories/{storyId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /community_follows/{followId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.followerId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.followerId == request.auth.uid;
+    }
+
+    match /schema_migrations/{migrationId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Personal AI OS",
+  "description": "Your private digital command center with workspace-aware AI, tasks, notes, files, calendar, goals, projects, learning, and community.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
