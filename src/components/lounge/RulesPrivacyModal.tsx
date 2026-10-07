@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 interface RulesPrivacyModalProps {
+  isOpen?: boolean;
   onClose: () => void;
   onOpenContact?: () => void;
 }
@@ -122,9 +123,11 @@ const COMMUNITY_RULES = [
 ];
 
 export const RulesPrivacyModal: React.FC<RulesPrivacyModalProps> = ({
+  isOpen = true,
   onClose,
   onOpenContact,
 }) => {
+  if (!isOpen) return null;
   const [showQuickRules, setShowQuickRules] = useState(false);
   const [micStatus, setMicStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const [camStatus, setCamStatus] = useState<'prompt' | 'granted' | 'denied'>('prompt');

@@ -24,6 +24,7 @@ import {
   GoalItem,
   ViewTab,
 } from '../types';
+import { RecentlyAccessedSection } from '../components/dashboard/RecentlyAccessedSection';
 
 interface DashboardViewProps {
   tasks: TaskItem[];
@@ -51,6 +52,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const { profile, user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [widgetOrder, setWidgetOrder] = useState<string[]>([
+    'recently_accessed',
     'tasks',
     'notes',
     'weather',
@@ -121,6 +123,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
         </div>
       </section>
+
+      {/* Recently Accessed Section: Tracks last 5 items (notes, tasks, files) for quick re-entry */}
+      {!hiddenWidgets.includes('recently_accessed') && (
+        <RecentlyAccessedSection
+          userId={user?.uid}
+          tasks={tasks}
+          notes={notes}
+          files={files}
+          onNavigateTab={setActiveTab}
+        />
+      )}
 
       {/* Widgets Area */}
       <section className="space-y-3">

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Search,
   Sparkles,
@@ -28,6 +28,10 @@ import {
   Globe,
   Radio,
   SlidersHorizontal,
+  Zap,
+  Briefcase,
+  Flame,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -56,7 +60,7 @@ import {
 } from '../services/db';
 import { askAI } from '../services/ai';
 
-// Modals
+// Modals & Sub-views
 import { StoryViewerModal } from '../components/lounge/StoryViewerModal';
 import { RulesPrivacyModal } from '../components/lounge/RulesPrivacyModal';
 import { ContactSupportModal } from '../components/lounge/ContactSupportModal';
@@ -65,6 +69,19 @@ import { CommunityProfileModal } from '../components/lounge/CommunityProfileModa
 import { RoomChatModal } from '../components/lounge/RoomChatModal';
 import { DirectChatModal } from '../components/lounge/DirectChatModal';
 import { ReportPostModal } from '../components/lounge/ReportPostModal';
+import { WhatsAppInbox } from '../components/lounge/WhatsAppInbox';
+import { InstagramExplore } from '../components/lounge/InstagramExplore';
+import { InstagramCreatePost } from '../components/lounge/InstagramCreatePost';
+import { InstagramProfile } from '../components/lounge/InstagramProfile';
+import { LoungeNotificationsTab } from '../components/lounge/LoungeNotificationsTab';
+import { LoungeAskAICardModal } from '../components/lounge/LoungeAskAICardModal';
+import { PulsesViewer } from '../components/lounge/PulsesViewer';
+import { CreatorStudioDashboard } from '../components/lounge/CreatorStudioDashboard';
+import {
+  rankBySmartAlgorithm,
+  recordAlgorithmInteraction,
+  getStoredAlgorithmProfile,
+} from '../services/algorithm';
 
 interface CommunityViewProps {
   posts: CommunityPostItem[];
@@ -119,12 +136,48 @@ const SEED_PROFILES: UserProfile[] = [
 ];
 
 export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPosts, onNavigate }) => {
-  const { user, profile } = useAuth();
+  const { user, profile, accountType, setAccountType } = useAuth();
 
-  // Navigation Tabs
+  // Navigation Tabs: The Lounge (Feed, Explore, Create, Inbox, Notifications, Profile, Rooms, People)
   const [activeTab, setActiveTab] = useState<
-    'for_you' | 'following' | 'latest' | 'trending' | 'my_posts' | 'saved' | 'communities' | 'people' | 'inbox'
-  >('for_you');
+    | 'feed'
+    | 'search'
+    | 'pulses'
+    | 'studio'
+    | 'create'
+    | 'inbox'
+    | 'notifications'
+    | 'profile'
+    | 'rooms'
+    | 'people'
+    | 'for_you'
+    | 'following'
+    | 'latest'
+    | 'trending'
+    | 'my_posts'
+    | 'saved'
+    | 'communities'
+  >(() => {
+    try {
+      const saved = localStorage.getItem('lounge_active_subtab');
+      if (saved) return saved as any;
+    } catch {}
+    return 'feed';
+  });
+
+  // Business vs Personal Account state synced across entire workspace
+  const handleToggleAccountType = async (newType: 'personal' | 'business') => {
+    await setAccountType(newType);
+    showToast(`Switched account mode to: ${newType === 'business' ? '💼 Business Account (Creator Mode)' : '👤 Personal Account'}`);
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('lounge_active_subtab', activeTab);
+    } catch {}
+  }, [activeTab]);
+  const [feedFilter, setFeedFilter] = useState<'for_you' | 'following' | 'trending' | 'saved'>('for_you');
+  const [isAskAICardOpen, setIsAskAICardOpen] = useState(false);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -146,6 +199,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   const [attachedFileName, setAttachedFileName] = useState<string | null>(null);
   const [isAiPolishing, setIsAiPolishing] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [localPosts, setLocalPosts] = useState<CommunityPostItem[]>([]);
   const composerRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +210,8 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   const [postCommentsMap, setPostCommentsMap] = useState<Record<string, CommunityCommentItem[]>>({});
   const [commentInputMap, setCommentInputMap] = useState<Record<string, string>>({});
   const [openOptionsMenuPostId, setOpenOptionsMenuPostId] = useState<string | null>(null);
+  const [heartAnimPostId, setHeartAnimPostId] = useState<string | null>(null);
+  const lastTapPostRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
 
   // Following & Blocked lists (synced with local storage & Firestore)
   const [followingSet, setFollowingSet] = useState<Set<string>>(() => {
@@ -260,17 +316,15 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   }, []);
 
   // Toggle Following a User
-  const handleToggleFollow = async (targetUserId: string, targetName: string) => {
+  const handleToggleFollow = async (targetUserId: string, _targetName: string) => {
     if (!user) return;
     const next = new Set(followingSet);
     const isNowFollowing = !next.has(targetUserId);
 
     if (isNowFollowing) {
       next.add(targetUserId);
-      showToast(`Now following ${targetName}`);
     } else {
       next.delete(targetUserId);
-      showToast(`Unfollowed ${targetName}`);
     }
 
     setFollowingSet(next);
@@ -295,19 +349,38 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   // Upload Story
   const handleStoryFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
+
+    if (!user) {
+      // Guest local story
+      const url = URL.createObjectURL(file);
+      const newStory: StoryItem = {
+        id: 'guest_' + Date.now(),
+        userId: 'guest',
+        authorName: profile?.name || 'Me',
+        authorAvatar: profile?.avatarUrl || '',
+        mediaUrl: url,
+        mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      };
+      setStories((prev) => [newStory, ...prev]);
+      showToast('Your 24-hour story is live!');
+      return;
+    }
 
     setIsUploadingStory(true);
     showToast('Uploading 24-hour story…');
 
     try {
-      await uploadStory(
+      const created = await uploadStory(
         user.uid,
         profile?.name || user.email?.split('@')[0] || 'Me',
         profile?.avatarUrl || '',
         file
       );
-      showToast('Story published to The Lounge!');
+      setStories((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
+      showToast('🎉 Your 24-hour story is published to The Lounge!');
     } catch (err) {
       console.warn('Story upload error:', err);
       // Local fallback story object
@@ -323,7 +396,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
         expiresAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
       };
       setStories((prev) => [newStory, ...prev]);
-      showToast('Story added for this session!');
+      showToast('Story added and saved locally!');
     } finally {
       setIsUploadingStory(false);
       if (storyInputRef.current) storyInputRef.current.value = '';
@@ -384,7 +457,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   // Handle Post Creation
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || (!postTitle.trim() && !postContent.trim()) || isPosting) return;
+    if ((!postTitle.trim() && !postContent.trim()) || isPosting) return;
 
     setIsPosting(true);
 
@@ -397,31 +470,65 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
     const detectedTags = (postContent.match(/#[a-zA-Z0-9_]+/g) || []).map((t) => t.replace('#', ''));
     if (detectedTags.length === 0) detectedTags.push('General');
 
+    const authorName = profile?.name || user?.email?.split('@')[0] || 'Community Explorer';
+    const authorAvatar = profile?.avatarUrl || '';
+    const newTitle = postTitle.trim() || postContent.slice(0, 60);
+    const newContent = postContent.trim();
+
+    // Optimistic local post for immediate rendering
+    const localPostItem: CommunityPostItem = {
+      id: 'local_' + Date.now(),
+      userId: user?.uid || 'guest',
+      authorId: user?.uid || 'guest',
+      authorName,
+      authorAvatar,
+      title: newTitle,
+      content: newContent,
+      tags: detectedTags,
+      visibility: postVisibility,
+      mediaUrls: attachments.map((a) => a.url),
+      mediaType: attachedVideo ? 'video' : attachedImage ? 'image' : undefined,
+      fileName: attachedFileName || undefined,
+      likesCount: 0,
+      upvotes: 0,
+      commentsCount: 0,
+      likedBy: [],
+      savedBy: [],
+      createdAt: new Date().toISOString(),
+    };
+
+    setLocalPosts((prev) => [localPostItem, ...prev]);
+    setPostTitle('');
+    setPostContent('');
+    setAttachedImage(null);
+    setAttachedVideo(null);
+    setAttachedFileName(null);
+
+    if (!user) {
+      setIsPosting(false);
+      showToast('Post published in Guest Mode! Sign in to sync across devices.');
+      return;
+    }
+
     try {
       await createCommunityPost({
         userId: user.uid,
         authorId: user.uid,
-        authorName: profile?.name || user.email?.split('@')[0] || 'Community Member',
-        authorAvatar: profile?.avatarUrl || '',
-        title: postTitle.trim() || postContent.slice(0, 60),
-        content: postContent.trim(),
+        authorName,
+        authorAvatar,
+        title: newTitle,
+        content: newContent,
         tags: detectedTags,
         visibility: postVisibility,
         mediaUrls: attachments.map((a) => a.url),
         mediaType: attachedVideo ? 'video' : attachedImage ? 'image' : undefined,
-        fileUrl: attachedFileName ? '#' : undefined,
         fileName: attachedFileName || undefined,
       });
 
-      setPostTitle('');
-      setPostContent('');
-      setAttachedImage(null);
-      setAttachedVideo(null);
-      setAttachedFileName(null);
       showToast('Post published to The Lounge!');
     } catch (err) {
-      console.warn('Create post error:', err);
-      showToast('Could not publish post. Please check your connection.');
+      console.warn('Create post sync notice:', err);
+      showToast('Post created in local feed (cloud sync pending).');
     } finally {
       setIsPosting(false);
     }
@@ -429,21 +536,69 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
 
   // Post Reactions
   const handleToggleLike = async (post: CommunityPostItem) => {
-    if (!user) return;
+    if (!user) {
+      // Guest local like toggle
+      setLocalPosts((prev) =>
+        prev.map((p) => {
+          if (p.id === post.id) {
+            const liked = (p.likedBy || []).includes('guest');
+            return {
+              ...p,
+              likesCount: liked ? Math.max(0, (p.likesCount || 1) - 1) : (p.likesCount || 0) + 1,
+              likedBy: liked ? (p.likedBy || []).filter((id) => id !== 'guest') : [...(p.likedBy || []), 'guest'],
+            };
+          }
+          return p;
+        })
+      );
+      return;
+    }
     const currentlyLiked = (post.likedBy || []).includes(user.uid);
     try {
       await togglePostReaction(post.id, user.uid, currentlyLiked);
-      showToast(currentlyLiked ? 'Unliked post' : 'Liked post ❤️');
+      if (!currentlyLiked) {
+        recordAlgorithmInteraction(post.tags, 'like');
+      }
+      // Instant silent update like Instagram (no popups)
     } catch (e) {
       console.warn('Like error:', e);
     }
   };
 
+  const handlePostDoubleTap = (post: CommunityPostItem) => {
+    const isLiked = user
+      ? (post.likedBy || []).includes(user.uid)
+      : (post.likedBy || []).includes('guest');
+    if (!isLiked) {
+      handleToggleLike(post);
+    }
+    setHeartAnimPostId(post.id);
+    setTimeout(() => {
+      setHeartAnimPostId((curr) => (curr === post.id ? null : curr));
+    }, 900);
+  };
+
+  const handlePostTap = (post: CommunityPostItem) => {
+    const now = Date.now();
+    if (lastTapPostRef.current.id === post.id && now - lastTapPostRef.current.time < 320) {
+      handlePostDoubleTap(post);
+      lastTapPostRef.current = { id: '', time: 0 };
+    } else {
+      lastTapPostRef.current = { id: post.id, time: now };
+    }
+  };
+
   const handleToggleSave = async (post: CommunityPostItem) => {
-    if (!user) return;
+    if (!user) {
+      showToast('Sign in to bookmark posts to your personal vault.');
+      return;
+    }
     const currentlySaved = (post.savedBy || []).includes(user.uid);
     try {
       await toggleSavePost(post.id, user.uid, currentlySaved);
+      if (!currentlySaved) {
+        recordAlgorithmInteraction(post.tags, 'save');
+      }
       showToast(currentlySaved ? 'Removed from saved' : 'Saved to your bookmarks 🔖');
     } catch (e) {
       console.warn('Save error:', e);
@@ -453,9 +608,27 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   // Comments
   const handleAddComment = async (postId: string) => {
     const text = (commentInputMap[postId] || '').trim();
-    if (!user || !text) return;
+    if (!text) return;
 
     setCommentInputMap((prev) => ({ ...prev, [postId]: '' }));
+
+    if (!user) {
+      const guestComment: CommunityCommentItem = {
+        id: 'guest_cmt_' + Date.now(),
+        postId,
+        userId: 'guest',
+        authorName: 'Guest Explorer',
+        authorAvatar: '',
+        content: text,
+        createdAt: new Date().toISOString(),
+      };
+      setPostCommentsMap((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), guestComment],
+      }));
+      showToast('Comment added in Guest Mode!');
+      return;
+    }
 
     try {
       await addPostComment({
@@ -468,6 +641,21 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
       showToast('Comment submitted.');
     } catch (err) {
       console.warn('Comment add error:', err);
+      // Still show in local comments map so user doesn't lose text
+      const offlineComment: CommunityCommentItem = {
+        id: 'offline_cmt_' + Date.now(),
+        postId,
+        userId: user.uid,
+        authorName: profile?.name || 'Community Member',
+        authorAvatar: profile?.avatarUrl || '',
+        content: text,
+        createdAt: new Date().toISOString(),
+      };
+      setPostCommentsMap((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), offlineComment],
+      }));
+      showToast('Comment saved to your view (offline).');
     }
   };
 
@@ -492,6 +680,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
 
   // Open Direct Message with a User
   const handleStartMessageWithUser = async (targetUserId: string, targetName: string) => {
+    setActiveTab('inbox');
     if (!user) return;
     try {
       const threadId = await getOrCreateDirectThread(
@@ -519,7 +708,13 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   };
 
   // Filter and Sort Posts
-  const visiblePosts = initialPosts.filter((post) => {
+  const allPosts = useMemo(() => {
+    const postIds = new Set(initialPosts.map((p) => p.id));
+    const uniqueLocal = localPosts.filter((lp) => !postIds.has(lp.id));
+    return [...uniqueLocal, ...initialPosts];
+  }, [localPosts, initialPosts]);
+
+  let visiblePosts = allPosts.filter((post) => {
     // Hide blocked users
     if (blockedUsers.has(post.userId) || blockedUsers.has(post.authorId)) return false;
 
@@ -551,8 +746,14 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
     return true;
   });
 
-  // Sort based on Tab
-  if (activeTab === 'trending') {
+  // Sort based on Tab & Smart Algorithm Engine
+  if (activeTab === 'feed' || activeTab === 'for_you') {
+    const scoredList = rankBySmartAlgorithm(visiblePosts, getStoredAlgorithmProfile());
+    visiblePosts = scoredList.map((s) => ({
+      ...s.item,
+      algorithmReason: s.recommendationReason,
+    }));
+  } else if (activeTab === 'trending') {
     visiblePosts.sort((a, b) => {
       const scoreA = (a.likesCount || 0) * 2 + (a.commentsCount || 0) * 3 + (a.savedBy?.length || 0);
       const scoreB = (b.likesCount || 0) * 2 + (b.commentsCount || 0) * 3 + (b.savedBy?.length || 0);
@@ -595,95 +796,15 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
         </div>
       )}
 
-      {/* Primary Lounge Header */}
-      <header className="flex flex-col gap-4 border-b border-[var(--color-border)]/70 pb-6 sm:flex-row sm:items-center sm:justify-between">
+      {/* Primary Community Header */}
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-border)]/70 pb-4">
         <div>
-          <p className="text-[11px] font-extrabold uppercase tracking-widest text-[var(--color-cyan)] flex items-center gap-1.5">
-            <span>🌐 AI OS Community</span>
-            <span>◇</span>
-            <span>The Lounge</span>
-          </p>
-          <h1 className="mt-1 text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--color-text)]">
-            Explore, Share &amp; Connect.
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--color-text)]">
+            Community
           </h1>
           <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-            Collaborative knowledge, public discussions, 24-hour stories, and real-time private messaging.
+            Connect, share updates, watch Pulses, and explore stories.
           </p>
-        </div>
-
-        {/* Secondary Header Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <button
-            type="button"
-            onClick={() => setShowRulesModal(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] hover:border-[var(--color-primary)] transition-all shadow-sm"
-          >
-            <Shield className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Rules &amp; privacy</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsSearchOpen(!isSearchOpen)}
-            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 font-semibold transition-all shadow-sm ${
-              isSearchOpen
-                ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/10 text-[var(--color-primary)]'
-                : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-primary)]'
-            }`}
-          >
-            <Search className="w-3.5 h-3.5 text-[var(--color-muted)]" />
-            <span>Search</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (user) {
-                setProfileModalUser({
-                  userId: user.uid,
-                  displayName: profile?.name || user.email?.split('@')[0] || 'Me',
-                  username: profile?.username,
-                  avatarUrl: profile?.avatarUrl,
-                  bio: profile?.bio,
-                  interests: profile?.interests,
-                });
-              }
-            }}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] hover:border-[var(--color-primary)] transition-all shadow-sm"
-          >
-            <User className="w-3.5 h-3.5 text-[var(--color-cyan)]" />
-            <span>My profile</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => storyInputRef.current?.click()}
-            disabled={isUploadingStory}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 font-semibold text-[var(--color-text)] hover:border-[var(--color-primary)] transition-all shadow-sm"
-          >
-            <Radio className="w-3.5 h-3.5 text-pink-400" />
-            <span>Story</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => composerRef.current?.scrollIntoView({ behavior: 'smooth' })}
-            className="flex items-center gap-1.5 rounded-xl bg-[var(--color-primary)] px-4 py-2 font-bold text-white hover:bg-[var(--color-primary-hover)] transition-all shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create Post</span>
-          </button>
-
-          {onNavigate && (
-            <button
-              type="button"
-              onClick={() => onNavigate('assistant')}
-              className="flex items-center gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 px-3 py-2 font-semibold text-purple-300 hover:bg-purple-500/20 transition-all shadow-sm"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Ask AI</span>
-            </button>
-          )}
         </div>
       </header>
 
@@ -696,56 +817,68 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
         onChange={handleStoryFileSelected}
       />
 
-      {/* Quick Search Bar (Toggled) */}
-      {isSearchOpen && (
-        <div className="flex items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 shadow-sm animate-fade-in">
-          <Search className="w-4 h-4 text-[var(--color-muted)] shrink-0 ml-2" />
-          <input
-            type="search"
-            autoFocus
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search posts, creators, hashtags, or topics in The Lounge…"
-            className="w-full bg-transparent text-xs text-[var(--color-text)] outline-none"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] mr-2"
-            >
-              Clear
-            </button>
-          )}
+      {/* Primary Community Navigation Bar */}
+      <nav className="flex items-center justify-between border-b border-[var(--color-border)] pb-2 overflow-x-auto gap-2 scrollbar-none text-xs font-extrabold">
+        <div className="flex items-center gap-1.5">
+          {[
+            { id: 'feed', label: 'Feed', icon: Radio },
+            { id: 'pulses', label: 'Pulses', icon: Zap },
+            { id: 'search', label: 'Explore', icon: Search },
+            { id: 'create', label: 'Create Post', icon: Plus },
+            { id: 'inbox', label: `Inbox ${threads.length > 0 ? `(${threads.length})` : ''}`, icon: MessageSquare },
+            { id: 'notifications', label: 'Activity', icon: Heart },
+            { id: 'profile', label: 'My Profile', icon: User },
+            ...(accountType === 'business'
+              ? [{ id: 'studio', label: 'Business Suite', icon: BarChart3 }]
+              : []),
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isTabActive = activeTab === tab.id || (tab.id === 'feed' && ['feed', 'for_you', 'following', 'latest', 'trending', 'my_posts', 'saved'].includes(activeTab));
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-2xl px-4 py-2.5 transition-all ${
+                  isTabActive
+                    ? 'bg-gradient-to-r from-[var(--color-primary)] via-indigo-600 to-[var(--color-cyan)] text-white shadow-md'
+                    : 'text-[var(--color-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
-      )}
 
-      {/* Lounge Navigation Tabs Bar */}
-      <nav className="flex items-center gap-1.5 overflow-x-auto border-b border-[var(--color-border)] pb-2 scrollbar-none text-xs font-bold">
-        {[
-          { id: 'for_you', label: 'For You' },
-          { id: 'following', label: 'Following' },
-          { id: 'latest', label: 'Latest' },
-          { id: 'trending', label: 'Trending' },
-          { id: 'my_posts', label: 'My Posts' },
-          { id: 'saved', label: 'Saved' },
-          { id: 'communities', label: 'Communities (Rooms)' },
-          { id: 'people', label: 'People' },
-          { id: 'inbox', label: `Inbox ${threads.length > 0 ? `(${threads.length})` : ''}` },
-        ].map((tab) => (
+        <div className="flex items-center gap-1.5 shrink-0 pl-2">
           <button
-            key={tab.id}
             type="button"
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`whitespace-nowrap rounded-xl px-3.5 py-2 transition-all ${
-              activeTab === tab.id
-                ? 'bg-[var(--color-primary)] text-white shadow-sm'
-                : 'text-[var(--color-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]'
+            onClick={() => setActiveTab('rooms')}
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 border transition-all ${
+              activeTab === 'rooms' || activeTab === 'communities'
+                ? 'border-[var(--color-cyan)] bg-[var(--color-cyan)]/15 text-[var(--color-cyan)]'
+                : 'border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
             }`}
           >
-            {tab.label}
+            <Globe className="w-3.5 h-3.5" />
+            <span>Rooms</span>
           </button>
-        ))}
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('people')}
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 border transition-all ${
+              activeTab === 'people'
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
+                : 'border-[var(--color-border)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>People</span>
+          </button>
+        </div>
       </nav>
 
       {/* Main Tab Content Routing */}
@@ -955,92 +1088,111 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
             )}
           </div>
         </section>
+      ) : activeTab === 'pulses' ? (
+        /* ========================================================
+           PULSES FEED (DYNAMIC VERTICAL SHORT VIDEO STREAM)
+        ======================================================== */
+        <PulsesViewer
+          onShowToast={showToast}
+          allProfiles={profiles}
+          onSelectCreator={(c) =>
+            setProfileModalUser({
+              userId: c.id,
+              displayName: c.name,
+              avatarUrl: c.avatarUrl,
+            })
+          }
+        />
+      ) : activeTab === 'studio' ? (
+        /* ========================================================
+           CREATOR STUDIO & BUSINESS CENTER
+        ======================================================== */
+        <CreatorStudioDashboard
+          posts={allPosts}
+          allProfiles={profiles}
+          onShowToast={showToast}
+          onNavigateTab={(tab) => setActiveTab(tab as any)}
+        />
+      ) : activeTab === 'search' ? (
+        /* ========================================================
+           INSTAGRAM-STYLE EXPLORE & SEARCH GRID
+        ======================================================== */
+        <InstagramExplore
+          posts={allPosts}
+          onSelectPost={(post) => {
+            setActiveTab('feed');
+            setTimeout(() => {
+              const el = document.getElementById(`post-${post.id}`);
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }}
+          onShowToast={showToast}
+        />
+      ) : activeTab === 'create' ? (
+        /* ========================================================
+           INSTAGRAM-STYLE POST CREATOR STUDIO
+        ======================================================== */
+        <InstagramCreatePost
+          onPostCreated={() => {
+            setActiveTab('feed');
+            showToast('🎉 Post published to The Lounge feed!');
+          }}
+          onShowToast={showToast}
+        />
       ) : activeTab === 'inbox' ? (
         /* ========================================================
-           INBOX (DIRECT MESSAGES) VIEW
+           LOUNGE DIRECT INBOX & REAL-TIME MESSAGING
         ======================================================== */
-        <section className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-[var(--color-text)]">
-                Direct Conversations
-              </h2>
-              <p className="text-xs text-[var(--color-muted)]">
-                Encrypted, private 1-on-1 chats with members across The Lounge.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs w-full sm:w-72">
-              <Search className="w-3.5 h-3.5 text-[var(--color-muted)] shrink-0" />
-              <input
-                type="search"
-                value={inboxSearch}
-                onChange={(e) => setInboxSearch(e.target.value)}
-                placeholder="Search conversations…"
-                className="w-full bg-transparent outline-none text-xs text-[var(--color-text)]"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {filteredThreads.map((thread) => {
-              const otherId = thread.participants.find((p) => p !== user?.uid) || '';
-              const otherName = thread.participantNames[otherId] || 'Member';
-              const otherAvatar = thread.participantAvatars[otherId];
-
-              return (
-                <div
-                  key={thread.id}
-                  onClick={() => setActiveThread(thread)}
-                  className="flex items-center justify-between rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 cursor-pointer hover:border-[var(--color-primary)] transition-all space-x-3 shadow-sm"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    {otherAvatar ? (
-                      <img
-                        src={otherAvatar}
-                        alt={otherName}
-                        className="h-10 w-10 rounded-full object-cover border border-[var(--color-border)]"
-                      />
-                    ) : (
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)]/20 text-xs font-bold text-[var(--color-primary)]">
-                        {otherName[0]?.toUpperCase() || 'U'}
-                      </span>
-                    )}
-
-                    <div className="min-w-0">
-                      <strong className="block text-xs font-bold text-[var(--color-text)] truncate">
-                        {otherName}
-                      </strong>
-                      <p className="text-xs text-[var(--color-muted)] truncate max-w-md">
-                        {thread.lastMessage || 'Say hello…'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="text-[10px] text-[var(--color-muted)]">
-                      {thread.updatedAt ? new Date(thread.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-
-            {filteredThreads.length === 0 && (
-              <div className="rounded-3xl border border-dashed border-[var(--color-border)] p-12 text-center text-xs text-[var(--color-muted)] space-y-2">
-                <MessageSquare className="w-8 h-8 text-[var(--color-muted)]/50 mx-auto" />
-                <p>No active conversations found.</p>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('people')}
-                  className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-xs font-bold text-white hover:bg-[var(--color-primary-hover)]"
-                >
-                  Browse People to Message
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
+        <WhatsAppInbox
+          threads={threads}
+          activeThread={activeThread}
+          onSelectThread={(t) => setActiveThread(t)}
+          onShowToast={showToast}
+          onStartMessageWithUser={handleStartMessageWithUser}
+          onOpenUserProfile={(u) => setProfileModalUser(u)}
+        />
+      ) : activeTab === 'notifications' ? (
+        /* ========================================================
+           LOUNGE ACTIVITY & NOTIFICATIONS (INSTA-STYLE ACTIVITY)
+        ======================================================== */
+        <LoungeNotificationsTab
+          onNavigateToInbox={() => setActiveTab('inbox')}
+          onNavigateToPost={(postId) => {
+            setActiveTab('feed');
+            setTimeout(() => {
+              const el = document.getElementById(`post-${postId}`);
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }}
+          onShowToast={showToast}
+        />
+      ) : activeTab === 'profile' ? (
+        /* ========================================================
+           LOUNGE USER PROFILE
+        ======================================================== */
+        <InstagramProfile
+          posts={allPosts}
+          stories={stories}
+          followingCount={followingSet.size}
+          followingSet={followingSet}
+          allProfiles={profiles}
+          onToggleFollow={(userId) => handleToggleFollow(userId, '')}
+          onSelectUser={(u) => setProfileModalUser(u)}
+          onNavigateSettings={() => onNavigate && onNavigate('settings')}
+          onSelectPost={(post) => {
+            setActiveTab('feed');
+            setTimeout(() => {
+              const el = document.getElementById(`post-${post.id}`);
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+          }}
+          onSelectStory={(idx) => setActiveStoryIndex(idx)}
+          onUploadStoryClick={() => storyInputRef.current?.click()}
+          onShowToast={showToast}
+          accountType={accountType}
+          onToggleAccountType={handleToggleAccountType}
+          onNavigateStudio={() => setActiveTab('studio')}
+        />
       ) : (
         /* ========================================================
            FEED SPACE (FOR YOU, FOLLOWING, LATEST, TRENDING, MY POSTS, SAVED)
@@ -1375,6 +1527,14 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
                   id={`post-${post.id}`}
                   className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm hover:border-[var(--color-primary)]/60 transition-all space-y-4"
                 >
+                  {/* Algorithmic Recommendation Pill */}
+                  {(post as any).algorithmReason && (
+                    <div className="flex items-center gap-1.5 rounded-full bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 px-3 py-1 text-[10px] font-bold text-[var(--color-primary)] w-fit">
+                      <Sparkles className="w-3 h-3 text-[var(--color-cyan)]" />
+                      <span>{(post as any).algorithmReason}</span>
+                    </div>
+                  )}
+
                   {/* Post Author Bar */}
                   <div className="flex items-start justify-between relative">
                     <div className="flex items-center gap-3">
@@ -1502,7 +1662,18 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
                   </div>
 
                   {/* Post Title & Content */}
-                  <div className="space-y-2">
+                  <div
+                    onClick={() => handlePostTap(post)}
+                    onDoubleClick={() => handlePostDoubleTap(post)}
+                    className="relative space-y-2 cursor-pointer select-none"
+                  >
+                    {(!post.mediaUrls || post.mediaUrls.length === 0) && heartAnimPostId === post.id && (
+                      <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center animate-ping duration-700">
+                        <div className="transform scale-125 transition-transform">
+                          <Heart className="w-16 h-16 fill-red-500 text-white drop-shadow-[0_0_20px_rgba(239,68,68,0.9)]" />
+                        </div>
+                      </div>
+                    )}
                     {post.title && (
                       <h3 className="text-sm sm:text-base font-bold text-[var(--color-text)]">
                         {post.title}
@@ -1513,9 +1684,20 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
                     </p>
                   </div>
 
-                  {/* Media Previews (Image or Video) */}
+                  {/* Media Previews (Image or Video) with Double-Tap to Like */}
                   {post.mediaUrls && post.mediaUrls.length > 0 && (
-                    <div className="rounded-2xl overflow-hidden border border-[var(--color-border)] max-h-96 bg-black/20">
+                    <div
+                      onClick={() => handlePostTap(post)}
+                      onDoubleClick={() => handlePostDoubleTap(post)}
+                      className="relative rounded-2xl overflow-hidden border border-[var(--color-border)] max-h-96 bg-black/20 cursor-pointer select-none"
+                    >
+                      {heartAnimPostId === post.id && (
+                        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center animate-ping duration-700">
+                          <div className="transform scale-125 transition-transform">
+                            <Heart className="w-20 h-20 fill-red-500 text-white drop-shadow-[0_0_20px_rgba(239,68,68,0.9)]" />
+                          </div>
+                        </div>
+                      )}
                       {post.mediaType === 'video' ? (
                         <video
                           src={post.mediaUrls[0]}
@@ -1779,6 +1961,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
         <CommunityProfileModal
           targetUser={profileModalUser}
           posts={initialPosts}
+          stories={stories}
           allProfiles={profiles}
           onClose={() => setProfileModalUser(null)}
           onOpenMessage={(uId, uName) => {
@@ -1786,6 +1969,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
             handleStartMessageWithUser(uId, uName);
           }}
           onShowToast={showToast}
+          onSelectStory={(idx) => setActiveStoryIndex(idx)}
         />
       )}
 
@@ -1794,8 +1978,8 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
         <RoomChatModal room={activeRoom} onClose={() => setActiveRoom(null)} />
       )}
 
-      {/* Direct 1-on-1 Chat Modal */}
-      {activeThread && (
+      {/* Direct 1-on-1 Chat Modal (Only when outside the main WhatsApp Inbox view) */}
+      {activeThread && activeTab !== 'inbox' && (
         <DirectChatModal
           thread={activeThread}
           onClose={() => setActiveThread(null)}
@@ -1818,6 +2002,12 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
           }}
         />
       )}
+
+      {/* Lounge Ask AI Popup Top-Up Card */}
+      <LoungeAskAICardModal
+        isOpen={isAskAICardOpen}
+        onClose={() => setIsAskAICardOpen(false)}
+      />
     </div>
   );
 };

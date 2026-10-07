@@ -47,9 +47,25 @@ export function getAdminDb() {
 }
 
 export async function runAutomatedMigrations() {
+  // In containerized or client-first environments without explicit Google Cloud Admin credentials,
+  // skip server-side batch writes to avoid permission errors. Client repositories populate defaults as needed.
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.log('[Migration] Firebase Admin credentials not provided in environment; skipping server migrations.');
+    return { success: true, skipped: true, reason: 'Firebase Admin credentials not configured in environment' };
+  }
+
   console.log('[Migration] Checking database schema migrations with Firebase Admin SDK...');
   try {
+    const app = getAdminApp();
+    if (!app) {
+      console.warn('[Migration] Firebase Admin App not initialized, skipping schema migrations.');
+      return { success: false, skipped: true, reason: 'Firebase Admin App not initialized' };
+    }
     const db = getAdminDb();
+    if (!db) {
+      console.warn('[Migration] Firebase Firestore not available, skipping schema migrations.');
+      return { success: false, skipped: true, reason: 'Firestore not available' };
+    }
     const migrationsCol = db.collection('schema_migrations');
 
     // Migration V1: Default Community Channels & Categories

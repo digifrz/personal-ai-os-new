@@ -16,14 +16,14 @@ import { AppError } from '../../lib/errors';
 export function subscribeGoals(userId: string, callback: (goals: GoalItem[]) => void) {
   const q = query(
     collection(db, 'goals'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
+    where('userId', '==', userId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const goals: GoalItem[] = [];
       snapshot.forEach((d) => goals.push({ id: d.id, ...d.data() } as GoalItem));
+      goals.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       callback(goals);
     },
     (err) => console.warn('Goals subscription notice:', err?.message || err)
@@ -66,14 +66,14 @@ export async function deleteGoal(id: string) {
 export function subscribeMilestones(goalId: string, callback: (milestones: MilestoneItem[]) => void) {
   const q = query(
     collection(db, 'milestones'),
-    where('goalId', '==', goalId),
-    orderBy('dueDate', 'asc')
+    where('goalId', '==', goalId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const milestones: MilestoneItem[] = [];
       snapshot.forEach((d) => milestones.push({ id: d.id, ...d.data() } as MilestoneItem));
+      milestones.sort((a, b) => (a.position || 0) - (b.position || 0));
       callback(milestones);
     },
     (err) => console.warn('Milestones subscription notice:', err?.message || err)

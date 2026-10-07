@@ -69,7 +69,7 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || (!inputText.trim() && !attachedFile && !isRecording)) return;
+    if (!inputText.trim() && !attachedFile && !isRecording) return;
 
     const content = inputText.trim();
     setInputText('');
@@ -89,8 +89,8 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
     try {
       await sendDirectMessage(thread.id, {
         threadId: thread.id,
-        senderId: user.uid,
-        senderName: profile?.name || user.email?.split('@')[0] || 'Me',
+        senderId: user?.uid || 'guest',
+        senderName: profile?.name || user?.email?.split('@')[0] || 'Guest',
         senderAvatar: profile?.avatarUrl || '',
         content: content || (attachments.length ? 'Shared an attachment' : 'Sent a voice note'),
         attachments: attachments.length ? attachments : undefined,
@@ -104,16 +104,16 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
   const handleToggleVoiceRecord = async () => {
     if (isRecording) {
       // Finish recording and send voice note
+      const duration = Math.max(1, recordingSeconds);
       setIsRecording(false);
-      if (!user) return;
 
       try {
         await sendDirectMessage(thread.id, {
           threadId: thread.id,
-          senderId: user.uid,
-          senderName: profile?.name || user.email?.split('@')[0] || 'Me',
+          senderId: user?.uid || 'guest',
+          senderName: profile?.name || user?.email?.split('@')[0] || 'Guest',
           senderAvatar: profile?.avatarUrl || '',
-          content: `🎙 Voice note (${recordingSeconds}s)`,
+          content: `🎙 Voice note (${duration}s)`,
         });
         onShowToast('Voice note sent!');
       } catch {

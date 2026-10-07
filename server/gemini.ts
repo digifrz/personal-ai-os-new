@@ -48,14 +48,27 @@ If asked to generate tasks, format each actionable task as [TASK: Title | Priori
   const contextString = req.context ? `\n\n--- CURRENT WORKSPACE CONTEXT ---\n${JSON.stringify(req.context, null, 2)}` : '';
   const fullPrompt = `${req.prompt}${contextString}`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3.6-flash',
-    contents: fullPrompt,
-    config: {
-      systemInstruction,
-      temperature: mode === 'code' ? 0.2 : 0.7,
-    },
-  });
+  const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  let lastError: any = null;
 
-  return response.text || 'No response generated.';
+  for (const model of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: fullPrompt,
+        config: {
+          systemInstruction,
+          temperature: mode === 'code' ? 0.2 : 0.7,
+        },
+      });
+      if (response && response.text) {
+        return response.text;
+      }
+    } catch (err: any) {
+      console.warn(`[Gemini Fallback] Model ${model} failed, trying next:`, err?.message || err);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('All candidate AI models were unavailable.');
 }

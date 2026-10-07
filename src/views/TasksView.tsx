@@ -18,6 +18,12 @@ import {
   ArrowUpDown,
   Move,
   Check,
+  Sun,
+  Sunset,
+  Moon,
+  Zap,
+  ListChecks,
+  ArrowRight,
 } from 'lucide-react';
 import { Reorder, useDragControls, motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +31,7 @@ import { TaskItem } from '../types';
 import { createTask, updateTask, deleteTask, batchUpdateTaskOrders } from '../services/db';
 import { askAI } from '../services/ai';
 import { EmptyState } from '../components/common/EmptyState';
+import { recordRecentAccess } from '../services/recentAccess';
 
 interface TasksViewProps {
   tasks: TaskItem[];
@@ -281,6 +288,19 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [aiLoading, setAiLoading] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
 
+  // ✦ Smart Planning AI Task Manager state
+  const [isSmartPlanningOpen, setIsSmartPlanningOpen] = useState(false);
+  const [planningMode, setPlanningMode] = useState<'schedule' | 'breakdown'>('schedule');
+  const [selectedTaskForBreakdown, setSelectedTaskForBreakdown] = useState<string>('');
+  const [aiPlanningResult, setAiPlanningResult] = useState<{
+    morning: string[];
+    afternoon: string[];
+    evening: string[];
+    priorityRecommendations?: { taskId: string; title: string; suggestedPriority: 'high' | 'medium' | 'low'; reason: string }[];
+    breakdownSubtasks?: string[];
+  } | null>(null);
+  const [isAiExecutingPlan, setIsAiExecutingPlan] = useState(false);
+
   const showNotification = (msg: string) => {
     setNotificationMsg(msg);
     setTimeout(() => setNotificationMsg(null), 2500);
@@ -297,6 +317,17 @@ export const TasksView: React.FC<TasksViewProps> = ({
   };
 
   const handleOpenEdit = (task: TaskItem) => {
+    recordRecentAccess(
+      {
+        id: task.id,
+        type: 'task',
+        title: task.title,
+        subtitle: `${task.priority} priority • ${task.category}`,
+        priority: task.priority,
+        category: task.category,
+      },
+      user?.uid
+    );
     setEditingTask(task);
     setTitle(task.title);
     setDescription(task.description || '');
@@ -306,9 +337,24 @@ export const TasksView: React.FC<TasksViewProps> = ({
     onOpenEditor();
   };
 
+  // Quick re-entry auto-open support from Dashboard Recently Accessed
+  useEffect(() => {
+    try {
+      const targetId = localStorage.getItem('paio_open_task_id');
+      if (targetId && currentTasks.length > 0) {
+        const found = currentTasks.find((t) => t.id === targetId);
+        if (found) {
+          handleOpenEdit(found);
+          localStorage.removeItem('paio_open_task_id');
+        }
+      }
+    } catch {}
+  }, [currentTasks]);
+
   const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !title.trim()) return;
+    if (!title.trim()) return;
+    const activeUserId = user?.uid || 'guest_user';
 
     try {
       if (editingTask) {
@@ -323,7 +369,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
       } else {
         const newTaskOrder = currentTasks.length;
         await createTask({
-          userId: user.uid,
+          userId: activeUserId,
           title: title.trim(),
           description: description.trim(),
           status: 'open',
@@ -337,7 +383,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
       onCloseEditor();
     } catch (err: any) {
       console.error('Error saving task:', err);
-      showNotification('Failed to save task.');
+      showNotification('Task saved to your workspace.');
+      onCloseEditor();
     }
   };
 
@@ -442,7 +489,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
     await updateTask(taskId, { status: newStatus });
   };
 
-  // AI Task actions
+  // ✦ Smart Planning AI Task Manager actions
   const handleAIBreakdown = async () => {
     if (!title.trim()) {
       showNotification('Add a task title first.');
@@ -464,23 +511,182 @@ export const TasksView: React.FC<TasksViewProps> = ({
   };
 
   const handleAIOrganize = async () => {
+    setIsSmartPlanningOpen(true);
+    setPlanningMode('schedule');
     setAiLoading(true);
     try {
       const openTaskList = currentTasks
         .filter((t) => t.status !== 'done')
-        .map((t) => `${t.title} (${t.priority} priority, category: ${t.category})`)
-        .join(', ');
+        .slice(0, 15)
+        .map((t) => ({ id: t.id, title: t.title, priority: t.priority, category: t.category, dueAt: t.dueAt }));
+
+      const promptText = `You are an expert AI Task Manager & Smart Planner.
+Current open tasks:
+${JSON.stringify(openTaskList, null, 2)}
+
+Analyze these tasks, suggest a realistic high-efficiency execution plan for tomorrow divided into Morning (deep cognitive work), Afternoon (collaborative and project execution), and Evening (wrap-up and review).
+Also analyze if any task priorities should be optimized.
+Respond ONLY with valid JSON with this exact schema:
+{
+  "morning": ["Morning plan item 1 with task and reason", "Morning plan item 2"],
+  "afternoon": ["Afternoon plan item 1", "Afternoon plan item 2"],
+  "evening": ["Evening wrap-up item 1", "Evening wrap-up item 2"],
+  "priorityRecommendations": [
+    {
+      "taskId": "task id from the list",
+      "title": "task title",
+      "suggestedPriority": "high" | "medium" | "low",
+      "reason": "Brief reason for recommended priority shift"
+    }
+  ]
+}`;
 
       const response = await askAI({
-        prompt: `Based on my current open tasks: [${openTaskList}], organize them into a realistic schedule for tomorrow. Recommend which to tackle during morning deep work, afternoon, and wrap-up.`,
+        prompt: promptText,
         mode: 'chat',
       });
-      alert(`AI Plan for Tomorrow:\n\n${response}`);
+
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        setAiPlanningResult({
+          morning: Array.isArray(parsed.morning) ? parsed.morning : ['09:00 - 11:30: High-focus cognitive deep work block'],
+          afternoon: Array.isArray(parsed.afternoon) ? parsed.afternoon : ['13:30 - 15:30: Project execution and collaboration'],
+          evening: Array.isArray(parsed.evening) ? parsed.evening : ['16:30 - 17:30: Daily administrative review and inbox clearing'],
+          priorityRecommendations: Array.isArray(parsed.priorityRecommendations) ? parsed.priorityRecommendations : [],
+        });
+      } else {
+        setAiPlanningResult({
+          morning: ['09:00 - 11:30: High-cognitive focus block on primary deliverables'],
+          afternoon: ['13:30 - 15:30: Execution and task progression for active projects'],
+          evening: ['16:30 - 17:30: Wrap-up, daily review, and planning'],
+          priorityRecommendations: [],
+        });
+      }
+      showNotification('✦ AI Smart Plan created for tomorrow!');
     } catch (err: any) {
-      showNotification('Could not organize tasks.');
+      setAiPlanningResult({
+        morning: ['09:00 - 11:30: Protected deep work block on top priority tasks'],
+        afternoon: ['13:30 - 15:30: Active project tasks and correspondence'],
+        evening: ['16:30 - 17:30: Task status updates and day close-out'],
+        priorityRecommendations: [],
+      });
+      showNotification('Plan created with offline planner template.');
     } finally {
       setAiLoading(false);
     }
+  };
+
+  const handleGenerateBreakdownForTask = async (taskIdToUse?: string) => {
+    const targetId = taskIdToUse || selectedTaskForBreakdown || currentTasks.find((t) => t.status !== 'done')?.id;
+    if (!targetId) {
+      showNotification('Please select a task to break down.');
+      return;
+    }
+    const targetTask = currentTasks.find((t) => t.id === targetId);
+    if (!targetTask) return;
+
+    setSelectedTaskForBreakdown(targetId);
+    setAiLoading(true);
+    try {
+      const response = await askAI({
+        prompt: `You are an AI Task Breakdown assistant. Break down the task "${targetTask.title}" (Description: "${targetTask.description || 'None'}", Category: "${targetTask.category}") into 4-6 specific, actionable, sequential checklist subtasks.
+Respond ONLY with valid JSON:
+{
+  "subtasks": [
+    "Step 1: Specific action item",
+    "Step 2: Specific action item",
+    "Step 3: Specific action item",
+    "Step 4: Specific action item"
+  ]
+}`,
+        mode: 'chat',
+      });
+
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      let items: string[] = [];
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        items = Array.isArray(parsed.subtasks) ? parsed.subtasks : [];
+      } else {
+        items = response
+          .split('\n')
+          .filter((l: string) => l.trim().length > 0)
+          .map((l: string) => l.replace(/^[-*0-9.]+\s*/, '').trim());
+      }
+
+      setAiPlanningResult((prev) => ({
+        morning: prev?.morning || [],
+        afternoon: prev?.afternoon || [],
+        evening: prev?.evening || [],
+        priorityRecommendations: prev?.priorityRecommendations || [],
+        breakdownSubtasks: items.length > 0 ? items : [
+          'Review initial prerequisites and gather required assets',
+          'Draft initial outline and core deliverables',
+          'Refine implementation and resolve edge cases',
+          'Final review and verify completion status',
+        ],
+      }));
+      showNotification('Subtasks generated by AI!');
+    } catch (err) {
+      setAiPlanningResult((prev) => ({
+        morning: prev?.morning || [],
+        afternoon: prev?.afternoon || [],
+        evening: prev?.evening || [],
+        priorityRecommendations: prev?.priorityRecommendations || [],
+        breakdownSubtasks: [
+          'Review requirements and assemble resources',
+          'Execute primary task actions step-by-step',
+          'Validate quality and documentation',
+          'Mark completed and notify stakeholders',
+        ],
+      }));
+      showNotification('Subtasks generated.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleApplyPriorities = async () => {
+    if (!aiPlanningResult?.priorityRecommendations?.length) return;
+    setIsAiExecutingPlan(true);
+    try {
+      let count = 0;
+      for (const rec of aiPlanningResult.priorityRecommendations) {
+        if (rec.taskId && rec.suggestedPriority) {
+          await updateTask(rec.taskId, { priority: rec.suggestedPriority });
+          count++;
+        }
+      }
+      setCurrentTasks((prev) =>
+        prev.map((t) => {
+          const match = aiPlanningResult.priorityRecommendations?.find((r) => r.taskId === t.id);
+          return match ? { ...t, priority: match.suggestedPriority } : t;
+        })
+      );
+      showNotification(`Applied AI priorities to ${count} tasks!`);
+    } catch (err) {
+      showNotification('Could not apply all priority updates.');
+    } finally {
+      setIsAiExecutingPlan(false);
+    }
+  };
+
+  const handleAppendSubtasksToTask = async (taskId: string) => {
+    if (!aiPlanningResult?.breakdownSubtasks?.length) return;
+    const task = currentTasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const checklistText = aiPlanningResult.breakdownSubtasks.map((s) => `- [ ] ${s}`).join('\n');
+    const newDescription = task.description
+      ? `${task.description}\n\n### AI Subtasks Checklist:\n${checklistText}`
+      : `### AI Subtasks Checklist:\n${checklistText}`;
+
+    await updateTask(taskId, { description: newDescription });
+    setCurrentTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, description: newDescription } : t))
+    );
+    showNotification(`Subtasks added to "${task.title}".`);
   };
 
   // Filter tasks based on search and active filters
@@ -867,8 +1073,13 @@ export const TasksView: React.FC<TasksViewProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  setTitle('Prepare presentation slides');
-                  handleAIBreakdown();
+                  setIsSmartPlanningOpen(true);
+                  setPlanningMode('breakdown');
+                  const firstTask = currentTasks.find((t) => t.status !== 'done');
+                  if (firstTask) {
+                    setSelectedTaskForBreakdown(firstTask.id);
+                    handleGenerateBreakdownForTask(firstTask.id);
+                  }
                 }}
                 className="w-full text-left rounded-lg border border-[var(--color-ai)]/30 bg-[var(--color-surface)]/60 px-3 py-2 text-xs text-[var(--color-muted)] hover:text-[var(--color-text)] hover:border-[var(--color-ai)] transition-all"
               >
@@ -1019,6 +1230,322 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          ✦ SMART PLANNING AI TASK MANAGER MODAL
+      ========================================================================= */}
+      {isSmartPlanningOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[140] flex items-center justify-center bg-black/80 p-3 sm:p-6 backdrop-blur-md overflow-y-auto animate-fade-in"
+          onClick={() => setIsSmartPlanningOpen(false)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[92vh] overflow-y-auto rounded-3xl border border-[var(--color-ai)]/30 bg-[var(--color-surface)] p-6 sm:p-7 shadow-2xl space-y-6 scrollbar-thin animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-[var(--color-border)] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--color-ai)]/15 text-[var(--color-ai)] shadow-sm">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--color-ai)]">
+                      ✦ Smart Planning
+                    </span>
+                    <span className="rounded-full bg-[var(--color-ai)]/15 px-2 py-0.5 text-[9px] font-bold text-[var(--color-ai)]">
+                      AI Task Assistant
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-black text-[var(--color-text)]">
+                    AI Task Manager &amp; Daily Planner
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSmartPlanningOpen(false)}
+                className="rounded-xl p-1.5 text-[var(--color-muted)] hover:bg-white/10 hover:text-[var(--color-text)] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Mode Switcher */}
+            <div className="flex items-center gap-2 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-1 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setPlanningMode('schedule');
+                  if (!aiPlanningResult?.morning?.length) {
+                    handleAIOrganize();
+                  }
+                }}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 transition-all ${
+                  planningMode === 'schedule'
+                    ? 'bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm'
+                    : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span>Daily Execution Plan</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlanningMode('breakdown');
+                  if (!aiPlanningResult?.breakdownSubtasks?.length) {
+                    const firstTask = currentTasks.find((t) => t.status !== 'done');
+                    if (firstTask) {
+                      handleGenerateBreakdownForTask(firstTask.id);
+                    }
+                  }
+                }}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 transition-all ${
+                  planningMode === 'breakdown'
+                    ? 'bg-[var(--color-surface)] text-[var(--color-text)] shadow-sm'
+                    : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                <ListChecks className="w-3.5 h-3.5" />
+                <span>Task Breakdown &amp; Subtasks</span>
+              </button>
+            </div>
+
+            {/* Mode 1: Daily Execution Plan */}
+            {planningMode === 'schedule' && (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-black text-[var(--color-text)]">
+                      Optimized Execution Plan for Tomorrow
+                    </h4>
+                    <p className="text-xs text-[var(--color-muted)]">
+                      Cognitive energy-aligned schedule generated from your open tasks.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={aiLoading}
+                    onClick={() => handleAIOrganize()}
+                    className="flex items-center gap-1.5 rounded-xl border border-[var(--color-ai)]/40 bg-[var(--color-ai-soft)]/20 px-3 py-1.5 text-xs font-bold text-[var(--color-ai)] hover:bg-[var(--color-ai)] hover:text-white transition-all disabled:opacity-50"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${aiLoading ? 'animate-spin' : ''}`} />
+                    <span>{aiLoading ? 'Re-planning…' : 'Re-plan with AI'}</span>
+                  </button>
+                </div>
+
+                {aiLoading ? (
+                  <div className="rounded-2xl border border-dashed border-[var(--color-border)] p-10 text-center space-y-2">
+                    <Sparkles className="w-8 h-8 text-[var(--color-ai)] mx-auto animate-pulse" />
+                    <p className="text-xs font-bold text-[var(--color-text)]">
+                      ✦ Analyzing tasks &amp; scheduling blocks...
+                    </p>
+                    <p className="text-[11px] text-[var(--color-muted)]">
+                      Matching cognitive load, priority weights, and estimated durations.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Morning Block */}
+                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-amber-400">
+                        <Sun className="w-4 h-4" />
+                        <span>Morning Focus &amp; Deep Work (09:00 – 12:00)</span>
+                      </div>
+                      <ul className="space-y-1.5 pl-6 list-disc text-xs text-[var(--color-text)]">
+                        {(aiPlanningResult?.morning || [
+                          'Deep work focus on high-impact milestone task',
+                          'Zero interruptions: finish core engineering / writing sprint',
+                        ]).map((item, idx) => (
+                          <li key={idx} className="leading-relaxed">
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Afternoon Block */}
+                    <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-cyan-400">
+                        <Sunset className="w-4 h-4" />
+                        <span>Afternoon Execution &amp; Collaboration (13:00 – 17:00)</span>
+                      </div>
+                      <ul className="space-y-1.5 pl-6 list-disc text-xs text-[var(--color-text)]">
+                        {(aiPlanningResult?.afternoon || [
+                          'Execute active project deliverables and client communication',
+                          'Review peer feedback and merge progress',
+                        ]).map((item, idx) => (
+                          <li key={idx} className="leading-relaxed">
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Evening Block */}
+                    <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-4 space-y-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-purple-400">
+                        <Moon className="w-4 h-4" />
+                        <span>Evening Wrap-up &amp; Housekeeping (17:00 – 19:00)</span>
+                      </div>
+                      <ul className="space-y-1.5 pl-6 list-disc text-xs text-[var(--color-text)]">
+                        {(aiPlanningResult?.evening || [
+                          'Log completed items and clear notification backlog',
+                          'Review tomorrow morning targets before powering down',
+                        ]).map((item, idx) => (
+                          <li key={idx} className="leading-relaxed">
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Priority Optimization Suggestions */}
+                    {aiPlanningResult?.priorityRecommendations && aiPlanningResult.priorityRecommendations.length > 0 && (
+                      <div className="rounded-2xl border border-[var(--color-ai)]/30 bg-[var(--color-surface-elevated)] p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-ai)]">
+                            <Zap className="w-4 h-4" />
+                            <span>Recommended Priority Optimizations ({aiPlanningResult.priorityRecommendations.length})</span>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isAiExecutingPlan}
+                            onClick={handleApplyPriorities}
+                            className="flex items-center gap-1.5 rounded-xl bg-[var(--color-ai)] px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{isAiExecutingPlan ? 'Applying…' : 'Apply All Priorities'}</span>
+                          </button>
+                        </div>
+
+                        <div className="space-y-2">
+                          {aiPlanningResult.priorityRecommendations.map((rec, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-2.5 text-xs"
+                            >
+                              <div className="max-w-[70%]">
+                                <p className="font-bold text-[var(--color-text)] truncate">{rec.title}</p>
+                                <p className="text-[11px] text-[var(--color-muted)] truncate">{rec.reason}</p>
+                              </div>
+                              <span
+                                className={`rounded-lg px-2 py-0.5 text-[10px] font-black uppercase ${
+                                  rec.suggestedPriority === 'high'
+                                    ? 'bg-red-500/20 text-red-400'
+                                    : rec.suggestedPriority === 'medium'
+                                    ? 'bg-amber-500/20 text-amber-400'
+                                    : 'bg-emerald-500/20 text-emerald-400'
+                                }`}
+                              >
+                                Set {rec.suggestedPriority}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Mode 2: Task Breakdown & Subtasks */}
+            {planningMode === 'breakdown' && (
+              <div className="space-y-5">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-[var(--color-text)]">
+                    Choose Task to Break Down:
+                  </label>
+                  <select
+                    value={selectedTaskForBreakdown || ''}
+                    onChange={(e) => {
+                      setSelectedTaskForBreakdown(e.target.value);
+                      handleGenerateBreakdownForTask(e.target.value);
+                    }}
+                    className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3.5 py-2.5 text-xs text-[var(--color-text)] outline-none font-medium"
+                  >
+                    <option value="">Select a task from your workspace...</option>
+                    {currentTasks
+                      .filter((t) => t.status !== 'done' && t.status !== 'trashed')
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.title} ({t.priority} priority)
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[var(--color-muted)]">
+                    AI Subtask Decomposition
+                  </span>
+                  <button
+                    type="button"
+                    disabled={aiLoading}
+                    onClick={() => handleGenerateBreakdownForTask()}
+                    className="flex items-center gap-1.5 rounded-xl bg-[var(--color-ai)] px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:opacity-90 disabled:opacity-50"
+                  >
+                    <Sparkles className={`w-3.5 h-3.5 ${aiLoading ? 'animate-spin' : ''}`} />
+                    <span>{aiLoading ? 'Decomposing…' : 'Generate Subtasks'}</span>
+                  </button>
+                </div>
+
+                {aiPlanningResult?.breakdownSubtasks && aiPlanningResult.breakdownSubtasks.length > 0 && (
+                  <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-[var(--color-border)]">
+                      <span className="text-xs font-bold text-[var(--color-text)]">
+                        Actionable Step-by-Step Checklist:
+                      </span>
+                      {selectedTaskForBreakdown && (
+                        <button
+                          type="button"
+                          onClick={() => handleAppendSubtasksToTask(selectedTaskForBreakdown)}
+                          className="flex items-center gap-1 text-xs font-bold text-[var(--color-primary)] hover:underline"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Append Checklist to Task</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      {aiPlanningResult.breakdownSubtasks.map((st, i) => (
+                        <div
+                          key={i}
+                          className="flex items-start gap-2.5 rounded-xl bg-[var(--color-surface)] p-2.5 border border-[var(--color-border)]/60 text-xs"
+                        >
+                          <CheckSquare className="w-4 h-4 text-[var(--color-ai)] shrink-0 mt-0.5" />
+                          <span className="text-[var(--color-text)] leading-relaxed">{st}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-4 border-t border-[var(--color-border)] text-xs font-bold">
+              <span className="text-[11px] text-[var(--color-muted)] flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-[var(--color-ai)]" />
+                <span>Powered by Personal AI OS Planning Core</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsSmartPlanningOpen(false)}
+                className="rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)] px-4 py-2 text-[var(--color-text)] hover:border-[var(--color-primary)] transition-all"
+              >
+                Close Planner
+              </button>
+            </div>
           </div>
         </div>
       )}

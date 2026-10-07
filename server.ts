@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { runAutomatedMigrations } from './server/migrations.ts';
@@ -7,14 +8,29 @@ import { extractAuth } from './server/middleware/auth.ts';
 import { errorHandler } from './server/middleware/errorHandler.ts';
 import { assistantRouter } from './server/routes/assistant.router.ts';
 import { userRouter } from './server/routes/user.router.ts';
+import { integrationsRouter } from './server/routes/integrations.router.ts';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Determine directory safely in both ESM and CJS bundle
+const getDirname = () => {
+  if (typeof __dirname !== 'undefined') {
+    return __dirname;
+  }
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.url) {
+      return path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch {
+    // Fall back to process.cwd()
+  }
+  return process.cwd();
+};
+
+const currentDir = getDirname();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
@@ -44,6 +60,7 @@ app.post('/api/migrations/run', async (_req, res) => {
 // Dedicated API Routers
 app.use('/api/assistant', assistantRouter);
 app.use('/api/user', userRouter);
+app.use('/api/integrations', integrationsRouter);
 
 // Global Centralized Error Handler (must be after routes)
 app.use(errorHandler);
@@ -64,7 +81,12 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, 'dist');
+    const candidates = [
+      path.resolve(process.cwd(), 'dist'),
+      currentDir,
+      path.resolve(currentDir, '..', 'dist'),
+    ];
+    const distPath = candidates.find((dir) => fs.existsSync(path.join(dir, 'index.html'))) || candidates[0];
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.resolve(distPath, 'index.html'));

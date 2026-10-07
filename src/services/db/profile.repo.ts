@@ -23,14 +23,14 @@ import { AppError } from '../../lib/errors';
 export function subscribeNotifications(userId: string, callback: (notifications: NotificationItem[]) => void) {
   const q = query(
     collection(db, 'notifications'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
+    where('userId', '==', userId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const notes: NotificationItem[] = [];
       snapshot.forEach((d) => notes.push({ id: d.id, ...d.data() } as NotificationItem));
+      notes.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       callback(notes);
     },
     (err) => console.warn('Notifications notice:', err?.message || err)
@@ -108,20 +108,40 @@ export async function checkIsFollowing(followerId: string, followingId: string):
 export function listenToActivityLogs(userId: string, callback: (logs: ActivityLogItem[]) => void) {
   const q = query(
     collection(db, 'activity_logs'),
-    where('userId', '==', userId),
-    orderBy('timestamp', 'desc')
+    where('userId', '==', userId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const logs: ActivityLogItem[] = [];
       snapshot.forEach((d) => logs.push({ id: d.id, ...d.data() } as ActivityLogItem));
+      logs.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
       callback(logs);
     },
     (err) => {
       console.warn('Activity logs notice:', err?.message || err);
     }
   );
+}
+
+export async function createActivityLog(log: Omit<ActivityLogItem, 'id' | 'timestamp'> & { timestamp?: string }) {
+  const now = log.timestamp || new Date().toISOString();
+  try {
+    return await addDoc(collection(db, 'activity_logs'), {
+      ...log,
+      timestamp: now,
+    });
+  } catch (err) {
+    console.warn('Error recording activity log to Firestore:', err);
+    return null;
+  }
+}
+
+export async function clearActivityLogs(userId: string) {
+  const q = query(collection(db, 'activity_logs'), where('userId', '==', userId));
+  const snap = await getDocs(q);
+  const promises = snap.docs.map((d) => deleteDoc(d.ref));
+  return Promise.all(promises);
 }
 
 export async function clearAllUserData(userId: string) {

@@ -9,8 +9,41 @@
     <meta property="og:description" content="Your private digital command center with workspace-aware AI, tasks, notes, files, calendar, goals, projects, learning, and community." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script type="text/javascript">
+      // 1. Ensure trailing slash on GitHub Pages repository root so relative ./assets/ resolve correctly
+      (function() {
+        var p = window.location.pathname;
+        if (
+          window.location.hostname.endsWith('github.io') &&
+          !p.endsWith('/') &&
+          !p.split('/').pop().includes('.')
+        ) {
+          window.location.replace(p + '/' + window.location.search + window.location.hash);
+        }
+      })();
+
+      // 2. Restore path from 404.html redirect if deployed on GitHub Pages
+      (function(l) {
+        if (l.search[1] === '/' ) {
+          var decoded = l.search.slice(1).split('&').map(function(s) { 
+            return s.replace(/~and~/g, '&');
+          }).join('?');
+          window.history.replaceState(null, null,
+              l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location));
+    </script>
   </head>
   <body>
+    <noscript>
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#080D18;color:#F1F5F9;font-family:sans-serif;text-align:center;padding:20px;">
+        <div>
+          <h2>JavaScript Required</h2>
+          <p>Please enable JavaScript in your browser to experience Personal AI OS.</p>
+        </div>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

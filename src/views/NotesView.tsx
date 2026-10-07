@@ -20,6 +20,7 @@ import { NoteItem } from '../types';
 import { createNote, updateNote, deleteNote, createTask, createFlashcard } from '../services/db';
 import { askAI } from '../services/ai';
 import { EmptyState } from '../components/common/EmptyState';
+import { recordRecentAccess } from '../services/recentAccess';
 
 interface NotesViewProps {
   notes: NoteItem[];
@@ -69,6 +70,17 @@ export const NotesView: React.FC<NotesViewProps> = ({
   };
 
   const handleOpenEdit = (note: NoteItem) => {
+    recordRecentAccess(
+      {
+        id: note.id,
+        type: 'note',
+        title: note.title,
+        subtitle: `${note.category} Note`,
+        category: note.category,
+        color: note.color,
+      },
+      user?.uid
+    );
     setEditingNote(note);
     setTitle(note.title);
     setBody(note.body);
@@ -78,6 +90,20 @@ export const NotesView: React.FC<NotesViewProps> = ({
     setTags(note.tags || []);
     onOpenEditor();
   };
+
+  // Quick re-entry auto-open support from Dashboard Recently Accessed
+  React.useEffect(() => {
+    try {
+      const targetId = localStorage.getItem('paio_open_note_id');
+      if (targetId && notes.length > 0) {
+        const found = notes.find((n) => n.id === targetId);
+        if (found) {
+          handleOpenEdit(found);
+          localStorage.removeItem('paio_open_note_id');
+        }
+      }
+    } catch {}
+  }, [notes]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

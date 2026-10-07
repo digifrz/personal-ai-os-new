@@ -10,8 +10,18 @@ interface EmptyStateProps {
   className?: string;
 }
 
+function renderEmptyIcon(icon: LucideIcon | React.ReactNode) {
+  if (!icon) return <Inbox className="h-6 w-6" />;
+  if (React.isValidElement(icon)) return icon;
+  if (typeof icon === 'function' || (typeof icon === 'object' && icon !== null && ('render' in icon || '$$typeof' in icon))) {
+    const Component = icon as React.ComponentType<{ className?: string }>;
+    return <Component className="h-6 w-6" />;
+  }
+  return <Inbox className="h-6 w-6" />;
+}
+
 export const EmptyState: React.FC<EmptyStateProps> = ({
-  icon: Icon = Inbox,
+  icon = Inbox,
   title,
   description,
   actionLabel,
@@ -23,7 +33,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       className={`flex min-h-[280px] w-full flex-col items-center justify-center rounded-3xl border border-dashed border-[var(--color-border)] p-8 text-center bg-[var(--color-surface)]/50 ${className}`}
     >
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-bg-secondary)] text-[var(--color-muted)] mb-3 border border-[var(--color-border)]">
-        {typeof Icon === 'function' ? <Icon className="h-6 w-6" /> : Icon}
+        {renderEmptyIcon(icon)}
       </div>
       <h3 className="text-sm font-bold text-[var(--color-text)] sm:text-base">
         {title}

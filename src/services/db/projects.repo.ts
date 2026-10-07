@@ -16,14 +16,14 @@ import { AppError } from '../../lib/errors';
 export function subscribeProjects(userId: string, callback: (projects: ProjectItem[]) => void) {
   const q = query(
     collection(db, 'projects'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
+    where('userId', '==', userId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const projects: ProjectItem[] = [];
       snapshot.forEach((d) => projects.push({ id: d.id, ...d.data() } as ProjectItem));
+      projects.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       callback(projects);
     },
     (err) => console.warn('Projects subscription notice:', err?.message || err)

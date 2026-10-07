@@ -16,14 +16,14 @@ import { AppError } from '../../lib/errors';
 export function subscribeCalendarEvents(userId: string, callback: (events: CalendarEventItem[]) => void) {
   const q = query(
     collection(db, 'calendar_events'),
-    where('userId', '==', userId),
-    orderBy('startDate', 'asc')
+    where('userId', '==', userId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const events: CalendarEventItem[] = [];
       snapshot.forEach((d) => events.push({ id: d.id, ...d.data() } as CalendarEventItem));
+      events.sort((a, b) => new Date(a.startsAt || 0).getTime() - new Date(b.startsAt || 0).getTime());
       callback(events);
     },
     (err) => console.warn('Calendar events subscription notice:', err?.message || err)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Sparkles, CheckSquare, FileText, FolderKanban, Calendar, ArrowRight, X } from 'lucide-react';
+import { Search, Sparkles, CheckSquare, FileText, FolderKanban, Calendar, ArrowRight, X, Brain, Activity, Compass, Mic, MicOff } from 'lucide-react';
 import { ViewTab } from '../types';
 
 interface CommandBarProps {
@@ -8,6 +8,7 @@ interface CommandBarProps {
   setActiveTab: (tab: ViewTab) => void;
   onQuickTask?: (title: string) => void;
   onQuickAI?: (prompt: string) => void;
+  onOpenTour?: () => void;
 }
 
 export const CommandBar: React.FC<CommandBarProps> = ({
@@ -16,10 +17,77 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   setActiveTab,
   onQuickTask,
   onQuickAI,
+  onOpenTour,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleVoiceCommand = () => {
+    setVoiceNotice(null);
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      setVoiceNotice('Voice commanding requires Chrome, Edge, or Safari with microphone permissions.');
+      return;
+    }
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setVoiceNotice('Listening… Speak your command now');
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((res: any) => res[0].transcript)
+          .join('');
+        setQuery(transcript);
+        setSelectedIndex(0);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('CommandBar voice recognition notice:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          setVoiceNotice('Microphone permission denied. Please allow microphone access in your browser.');
+        } else if (event.error !== 'aborted') {
+          setVoiceNotice(`Voice error: ${event.error}`);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setTimeout(() => setVoiceNotice(null), 3000);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn('Voice command start notice:', err);
+      setIsListening(false);
+      setVoiceNotice('Could not start microphone. Check browser permissions.');
+    }
+  };
 
   const defaultSuggestions = [
     {
@@ -81,6 +149,22 @@ export const CommandBar: React.FC<CommandBarProps> = ({
       icon: Calendar,
       color: '#F472B6',
       action: () => setActiveTab('calendar'),
+    },
+    {
+      id: 'memory',
+      label: 'AI Memory Context',
+      hint: 'Your context, in your control · preferences & goals',
+      icon: Brain,
+      color: '#67E8F9',
+      action: () => setActiveTab('memory'),
+    },
+    {
+      id: 'activity',
+      label: 'Activity History',
+      hint: 'Real-time synchronization logs for your private workspace',
+      icon: Activity,
+      color: '#FDBA74',
+      action: () => setActiveTab('activity'),
     },
   ];
 
@@ -176,8 +260,28 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           </button>
         </div>
 
+        {/* Voice status banner if active */}
+        {voiceNotice && (
+          <div className="mt-3 flex items-center justify-between rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-xs text-indigo-300">
+            <span className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+              <span>{voiceNotice}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setVoiceNotice(null)}
+              className="text-xs text-indigo-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Input box */}
-        <div className="mt-4 flex items-center gap-3 rounded-xl border border-[var(--color-primary)]/70 bg-[var(--color-bg-secondary)] px-4 py-3 text-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary)]/30">
+        <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-[var(--color-primary)]/70 bg-[var(--color-bg-secondary)] px-3.5 py-2.5 text-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary)]/30">
           <Search className="w-5 h-5 shrink-0" />
           <input
             ref={inputRef}
@@ -187,9 +291,34 @@ export const CommandBar: React.FC<CommandBarProps> = ({
               setSelectedIndex(0);
             }}
             onKeyDown={handleInputKeyDown}
-            placeholder="Type a command, task, or question for your workspace..."
+            placeholder="Type or speak a command, task, or question..."
             className="w-full bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-muted)]"
           />
+
+          {/* Voice Command Microphone Button */}
+          <button
+            type="button"
+            onClick={toggleVoiceCommand}
+            title={isListening ? 'Stop listening' : 'Speak voice command (Microphone)'}
+            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all shrink-0 ${
+              isListening
+                ? 'bg-rose-500 text-white animate-pulse shadow-md shadow-rose-500/30'
+                : 'text-[var(--color-muted)] hover:text-indigo-400 hover:bg-white/5'
+            }`}
+          >
+            {isListening ? (
+              <>
+                <Mic className="w-3.5 h-3.5" />
+                <span className="text-[10px] hidden sm:inline">Listening…</span>
+              </>
+            ) : (
+              <>
+                <Mic className="w-3.5 h-3.5" />
+                <span className="text-[10px] hidden sm:inline">Voice</span>
+              </>
+            )}
+          </button>
+
           <kbd className="hidden sm:inline-block rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-[10px] text-[var(--color-muted)]">
             Esc
           </kbd>

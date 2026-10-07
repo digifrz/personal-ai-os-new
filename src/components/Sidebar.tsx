@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   User as UserIcon,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ViewTab } from '../types';
@@ -32,12 +33,18 @@ interface SidebarProps {
   activeTab: ViewTab;
   setActiveTab: (tab: ViewTab) => void;
   unreadNotificationsCount: number;
+  onOpenAbout: () => void;
+  onForceRefresh?: () => void;
+  isSyncing?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   unreadNotificationsCount,
+  onOpenAbout,
+  onForceRefresh,
+  isSyncing = false,
 }) => {
   const { user, profile, logout } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -72,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       label: 'Community',
       links: [
-        { id: 'community' as ViewTab, label: 'The Lounge', icon: Users, color: '#F472B6' },
+        { id: 'community' as ViewTab, label: 'Community', icon: Users, color: '#F472B6' },
       ],
     },
     {
@@ -82,13 +89,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'files' as ViewTab, label: 'Files', icon: FolderKanban, color: '#60A5FA' },
         { id: 'tasks' as ViewTab, label: 'Tasks', icon: CheckSquare, color: '#34D399' },
         { id: 'calendar' as ViewTab, label: 'Calendar', icon: Calendar, color: '#F472B6' },
-        {
-          id: 'notifications' as ViewTab,
-          label: 'Notifications',
-          icon: Bell,
-          color: '#FB923C',
-          badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined,
-        },
       ],
     },
     {
@@ -103,7 +103,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'goals' as ViewTab, label: 'Goals', icon: Target, color: '#FBBF24' },
         { id: 'projects' as ViewTab, label: 'Projects', icon: FolderKanban, color: '#38BDF8' },
         { id: 'analytics' as ViewTab, label: 'Analytics', icon: BarChart3, color: '#4ADE80' },
-        { id: 'activity' as ViewTab, label: 'Activity', icon: Activity, color: '#FDBA74' },
+        {
+          id: 'activity' as ViewTab,
+          label: 'Activity History',
+          icon: Activity,
+          color: '#FDBA74',
+          badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined,
+        },
       ],
     },
     {
@@ -116,8 +122,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       label: 'Utilities',
       links: [
-        { id: 'favorites' as ViewTab, label: 'Favorites', icon: Star, color: '#FBBF24' },
-        { id: 'recent' as ViewTab, label: 'Recent', icon: Clock, color: '#22D3EE' },
         { id: 'trash' as ViewTab, label: 'Trash', icon: Trash2, color: '#FB7185' },
       ],
     },

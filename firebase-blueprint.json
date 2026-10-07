@@ -341,12 +341,26 @@
         "createdAt": { "type": "string" }
       },
       "required": ["userId", "role", "text"]
+    },
+    "SearchHistory": {
+      "title": "SearchHistory",
+      "description": "User search history entries in workspace search",
+      "type": "object",
+      "properties": {
+        "query": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["query"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
       "description": "User profile and preferences"
+    },
+    "/users/{userId}/search_history/{historyId}": {
+      "schema": "SearchHistory",
+      "description": "User personal search history records"
     },
     "/tasks/{taskId}": {
       "schema": "Task",

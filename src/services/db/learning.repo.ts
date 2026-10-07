@@ -20,14 +20,14 @@ import { AppError } from '../../lib/errors';
 export function subscribeSubjects(userId: string, callback: (subjects: LearningSubjectItem[]) => void) {
   const q = query(
     collection(db, 'learning_subjects'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
+    where('userId', '==', userId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const subjects: LearningSubjectItem[] = [];
       snapshot.forEach((d) => subjects.push({ id: d.id, ...d.data() } as LearningSubjectItem));
+      subjects.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
       callback(subjects);
     },
     (err) => console.warn('Subjects notice:', err?.message || err)
@@ -46,14 +46,14 @@ export async function createSubject(subject: Omit<LearningSubjectItem, 'id' | 'c
 export function subscribeFlashcards(userId: string, callback: (cards: FlashcardItem[]) => void) {
   const q = query(
     collection(db, 'learning_flashcards'),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
+    where('userId', '==', userId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const cards: FlashcardItem[] = [];
       snapshot.forEach((d) => cards.push({ id: d.id, ...d.data() } as FlashcardItem));
+      cards.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       callback(cards);
     },
     (err) => console.warn('Flashcards notice:', err?.message || err)
@@ -83,14 +83,14 @@ export async function deleteFlashcard(id: string) {
 export function subscribeStudySessions(userId: string, callback: (sessions: StudySessionItem[]) => void) {
   const q = query(
     collection(db, 'study_sessions'),
-    where('userId', '==', userId),
-    orderBy('startedAt', 'desc')
+    where('userId', '==', userId)
   );
   return onSnapshot(
     q,
     (snapshot) => {
       const sessions: StudySessionItem[] = [];
       snapshot.forEach((d) => sessions.push({ id: d.id, ...d.data() } as StudySessionItem));
+      sessions.sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime());
       callback(sessions);
     },
     (err) => console.warn('Study sessions notice:', err?.message || err)

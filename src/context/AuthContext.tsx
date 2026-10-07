@@ -15,6 +15,9 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  accountType: 'personal' | 'business';
+  setAccountType: (type: 'personal' | 'business') => Promise<void>;
+  toggleAccountType: () => Promise<void>;
   signInWithGoogle: () => Promise<boolean>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, name: string) => Promise<void>;
@@ -31,63 +34,120 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Global account mode state: 'personal' | 'business'
+  const [localAccountType, setLocalAccountType] = useState<'personal' | 'business'>(() => {
+    try {
+      const saved = localStorage.getItem('paio_account_type');
+      if (saved === 'business' || saved === 'personal') return saved;
+    } catch {}
+    return 'personal';
+  });
+
+  // Effective accountType prioritizes profile from cloud, falling back to local
+  const currentAccountType: 'personal' | 'business' = profile?.accountType || localAccountType;
+
+  // Listen for storage events across tabs or local changes
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'paio_account_type' && (e.newValue === 'business' || e.newValue === 'personal')) {
+        setLocalAccountType(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   useEffect(() => {
     validateFirestoreConnection();
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        // Sync or retrieve user profile
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userDoc = await getDoc(userRef);
-        
-        if (!userDoc.exists()) {
-          const newProfile: UserProfile = {
-            userId: currentUser.uid,
-            name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Member',
-            email: currentUser.email || '',
-            avatarUrl: currentUser.photoURL || '',
-            bio: '',
-            username: (currentUser.displayName || currentUser.email?.split('@')[0] || 'member').toLowerCase().replace(/[^a-z0-9_]/g, ''),
-            theme: 'dark',
-            accentColor: '#8B5CF6',
-            compactMode: false,
-            aiModel: 'Balanced (Gemini 3.6 Flash)',
-            aiBehavior: 'Helpful and concise',
-            aiMemoryEnabled: true,
-            emailNotifications: true,
-            pushNotifications: true,
-            taskReminders: true,
-            calendarReminders: true,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            updatedAt: new Date().toISOString(),
-          };
-          await setDoc(userRef, newProfile);
-          setProfile(newProfile);
-        } else {
-          setProfile(userDoc.data() as UserProfile);
-        }
-
-        // Listen for profile changes in real time
-        const unsubProfile = onSnapshot(
-          userRef,
-          (snap) => {
-            if (snap.exists()) {
-              setProfile(snap.data() as UserProfile);
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (currentUser) => {
+        setUser(currentUser);
+        if (currentUser) {
+          try {
+            // Sync or retrieve user profile
+            const userRef = doc(db, 'users', currentUser.uid);
+            const userDoc = await getDoc(userRef);
+            
+            if (!userDoc.exists()) {
+              const newProfile: UserProfile = {
+                userId: currentUser.uid,
+                name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Member',
+                email: currentUser.email || '',
+                avatarUrl: currentUser.photoURL || '',
+                bio: '',
+                username: (currentUser.displayName || currentUser.email?.split('@')[0] || 'member').toLowerCase().replace(/[^a-z0-9_]/g, ''),
+                theme: 'dark',
+                accentColor: '#8B5CF6',
+                compactMode: false,
+                aiModel: 'Balanced (Gemini 3.6 Flash)',
+                aiBehavior: 'Helpful and concise',
+                aiMemoryEnabled: true,
+                emailNotifications: true,
+                pushNotifications: true,
+                taskReminders: true,
+                calendarReminders: true,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                updatedAt: new Date().toISOString(),
+              };
+              await setDoc(userRef, newProfile).catch((err) => {
+                console.warn('Profile write notice (using client state):', err);
+              });
+              setProfile(newProfile);
+            } else {
+              setProfile(userDoc.data() as UserProfile);
             }
-          },
-          (err) => {
-            console.warn('User profile sync notice:', err?.message || err);
-          }
-        );
 
-        setLoading(false);
-        return () => unsubProfile();
-      } else {
-        setProfile(null);
+            // Listen for profile changes in real time
+            const unsubProfile = onSnapshot(
+              userRef,
+              (snap) => {
+                if (snap.exists()) {
+                  setProfile(snap.data() as UserProfile);
+                }
+              },
+              (err) => {
+                console.warn('User profile sync notice:', err?.message || err);
+              }
+            );
+
+            setLoading(false);
+            return () => unsubProfile();
+          } catch (profileError) {
+            console.warn('Could not sync user profile from Firestore, using local identity:', profileError);
+            setProfile({
+              userId: currentUser.uid,
+              name: currentUser.displayName || currentUser.email?.split('@')[0] || 'Member',
+              email: currentUser.email || '',
+              avatarUrl: currentUser.photoURL || '',
+              bio: '',
+              username: (currentUser.displayName || currentUser.email?.split('@')[0] || 'member').toLowerCase().replace(/[^a-z0-9_]/g, ''),
+              theme: 'dark',
+              accentColor: '#8B5CF6',
+              compactMode: false,
+              aiModel: 'Balanced (Gemini 3.6 Flash)',
+              aiBehavior: 'Helpful and concise',
+              aiMemoryEnabled: true,
+              emailNotifications: true,
+              pushNotifications: true,
+              taskReminders: true,
+              calendarReminders: true,
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              updatedAt: new Date().toISOString(),
+            });
+            setLoading(false);
+          }
+        } else {
+          setProfile(null);
+          setLoading(false);
+        }
+      },
+      (authError) => {
+        console.warn('Firebase Auth state error:', authError);
         setLoading(false);
       }
-    });
+    );
 
     return () => unsubscribe();
   }, []);
@@ -169,12 +229,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const setAccountType = async (newType: 'personal' | 'business') => {
+    setLocalAccountType(newType);
+    try {
+      localStorage.setItem('paio_account_type', newType);
+      window.dispatchEvent(new CustomEvent('paio:account-type-changed', { detail: newType }));
+    } catch {}
+    if (user) {
+      await updateUserProfile({ accountType: newType }).catch((err) => {
+        console.warn('Could not sync accountType to Firestore profile:', err);
+      });
+    }
+  };
+
+  const toggleAccountType = async () => {
+    const nextType: 'personal' | 'business' = currentAccountType === 'business' ? 'personal' : 'business';
+    await setAccountType(nextType);
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
         profile,
         loading,
+        accountType: currentAccountType,
+        setAccountType,
+        toggleAccountType,
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,

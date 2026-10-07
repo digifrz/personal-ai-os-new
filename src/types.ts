@@ -6,6 +6,7 @@ export interface UserProfile {
   bio?: string;
   username?: string;
   interests?: string[];
+  website?: string;
   followersCount?: number;
   followingCount?: number;
   isOnline?: boolean;
@@ -20,6 +21,13 @@ export interface UserProfile {
   taskReminders?: boolean;
   calendarReminders?: boolean;
   timezone?: string;
+  accountType?: 'personal' | 'business';
+  businessCategory?: string;
+  businessCta?: string;
+  businessEmail?: string;
+  businessPhone?: string;
+  businessWebsite?: string;
+  accountVerified?: boolean;
   updatedAt?: string;
 }
 
@@ -163,14 +171,26 @@ export interface StudySessionItem {
 export interface AIMemoryItem {
   id: string;
   userId: string;
-  type: 'explicit' | 'preference' | 'learning' | 'project' | 'goal';
+  type:
+    | 'personal'
+    | 'goal'
+    | 'project'
+    | 'learning'
+    | 'preference'
+    | 'conversation'
+    | 'temporary'
+    | 'explicit'
+    | 'derived'
+    | string;
   title: string;
   content: string;
   source: string;
   importance: number;
   isVisible: boolean;
+  is_visible?: boolean;
   createdAt: string;
   updatedAt: string;
+  lastUsedAt?: string;
 }
 
 export interface AIConversationItem {
@@ -192,10 +212,15 @@ export interface AIConversationItem {
 export interface NotificationItem {
   id: string;
   userId: string;
-  type?: 'tasks' | 'events' | 'files' | 'ai' | 'messages' | 'system' | string;
+  type?: 'tasks' | 'events' | 'files' | 'ai' | 'messages' | 'system' | 'community' | 'storage' | string;
   title: string;
   message: string;
   sourceId?: string | null;
+  linkTab?: ViewTab;
+  linkAction?: string;
+  priority?: 'normal' | 'high' | 'urgent';
+  actorName?: string;
+  actorAvatar?: string;
   isRead: boolean;
   readAt?: string | null;
   createdAt: string;
@@ -285,13 +310,14 @@ export interface StoryItem {
   authorAvatar?: string;
   mediaUrl: string;
   mediaType: 'image' | 'video';
+  caption?: string;
   createdAt: string;
   expiresAt: string;
 }
 
 export interface AIChatMessage {
   id: string;
-  userId: string;
+  userId?: string;
   role: 'user' | 'model';
   text: string;
   createdAt: string;
@@ -304,6 +330,10 @@ export interface ActivityLogItem {
   entityType: string;
   entityTitle: string;
   timestamp: string;
+  details?: string;
+  source?: string;
+  actor?: 'user' | 'assistant' | 'system';
+  status?: 'success' | 'warning' | 'info';
 }
 
 export type ViewTab =
