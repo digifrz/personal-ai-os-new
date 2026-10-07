@@ -12,6 +12,7 @@ import { AboutAppModal } from './components/AboutAppModal';
 import { AITopUpModal } from './components/AITopUpModal';
 import { RulesPrivacyModal } from './components/lounge/RulesPrivacyModal';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { OfflineIndicator } from './components/common/OfflineIndicator';
 
 import { DashboardView } from './views/DashboardView';
 import { TasksView } from './views/TasksView';
@@ -843,6 +844,9 @@ function WorkspaceApp() {
         isOpen={isLoungeRulesOpen}
         onClose={() => setIsLoungeRulesOpen(false)}
       />
+
+      {/* Real-time Offline Connectivity Banner */}
+      <OfflineIndicator />
     </motion.div>
   );
 }

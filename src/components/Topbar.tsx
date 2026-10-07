@@ -27,6 +27,7 @@ import { useAuth } from '../context/AuthContext';
 import { ViewTab, NotificationItem } from '../types';
 import { markAllNotificationsRead, markNotificationRead } from '../services/db';
 import { AccountSwitcher } from './AccountSwitcher';
+import { PWAInstallButton } from './common/PWAInstallButton';
 
 interface TopbarProps {
   activeTab: ViewTab;
@@ -231,6 +232,9 @@ export const Topbar: React.FC<TopbarProps> = ({
             <span className="hidden sm:inline">Rules &amp; Privacy</span>
           </button>
         )}
+
+        {/* PWA Install Button */}
+        <PWAInstallButton />
 
         {/* Guide & Policies button */}
         <button

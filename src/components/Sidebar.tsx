@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ViewTab } from '../types';
+import { PWAInstallButton } from './common/PWAInstallButton';
 
 interface SidebarProps {
   activeTab: ViewTab;
@@ -260,6 +261,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer with settings, profile and signout */}
         <div className="shrink-0 p-2.5 border-t border-[var(--color-border)] space-y-1">
+          {/* PWA Install Button in sidebar */}
+          <PWAInstallButton variant={isCollapsed && !isMobileOpen ? 'icon' : 'sidebar'} />
+
           <button
             type="button"
             onClick={() => handleNavClick('settings')}
