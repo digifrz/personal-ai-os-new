@@ -1,3 +1,14 @@
+// Fast Refresh preamble guard to ensure safety under Service Worker caching or SSR
+if (typeof window !== 'undefined') {
+  if (!window.$RefreshReg$) {
+    window.$RefreshReg$ = () => {};
+  }
+  if (!window.$RefreshSig$) {
+    window.$RefreshSig$ = () => (type: any) => type;
+  }
+  (window as any).__vite_plugin_react_preamble_installed__ = true;
+}
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
   User,

@@ -15,12 +15,12 @@ assistantRouter.use(aiLimiter);
 
 assistantRouter.post('/', async (req: Request, res: Response, next) => {
   try {
-    const { prompt, mode, context, projectId, media } = req.body;
+    const { prompt, mode, context, projectId, media, provider, openaiApiKey } = req.body;
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'Prompt string is required' });
     }
 
-    const answer = await processAssistantRequest({ prompt, mode, context, projectId, media });
+    const answer = await processAssistantRequest({ prompt, mode, context, projectId, media, provider, openaiApiKey });
     res.json({ answer, timestamp: new Date().toISOString() });
   } catch (error) {
     next(error);

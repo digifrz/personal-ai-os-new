@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { VideoCallProvider } from './context/VideoCallContext';
+import { VideoCallProvider, useVideoCall } from './context/VideoCallContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { BreadcrumbNav } from './components/BreadcrumbNav';
@@ -11,6 +11,11 @@ import { AuthModal } from './components/AuthModal';
 import { AboutAppModal } from './components/AboutAppModal';
 import { AITopUpModal } from './components/AITopUpModal';
 import { RulesPrivacyModal } from './components/lounge/RulesPrivacyModal';
+import { VideoCallInterface } from './components/lounge/VideoCallInterface';
+import { SpotifyOSPlayer } from './components/common/SpotifyOSPlayer';
+import { GoogleWorkspaceModal } from './components/common/GoogleWorkspaceModal';
+import { OSAppHubModal } from './components/common/OSAppHubModal';
+import { FloatingAssistantWidget } from './components/common/FloatingAssistantWidget';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 
@@ -143,6 +148,10 @@ function WorkspaceApp() {
   const [isEventEditorOpen, setIsEventEditorOpen] = useState(false);
   const [isAITopUpOpen, setIsAITopUpOpen] = useState(false);
   const [isLoungeRulesOpen, setIsLoungeRulesOpen] = useState(false);
+  const [isAppHubOpen, setIsAppHubOpen] = useState(false);
+  const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
+  const [isGoogleWorkspaceOpen, setIsGoogleWorkspaceOpen] = useState(false);
+  const { startCall } = useVideoCall();
   const [hasSeenGuide, setHasSeenGuide] = useState(() => {
     try {
       return localStorage.getItem('has_seen_app_guide_v1') === 'true';
@@ -735,6 +744,10 @@ function WorkspaceApp() {
           onOpenAbout={() => setIsAboutModalOpen(true)}
           onOpenAITopUp={() => setIsAITopUpOpen(true)}
           onOpenLoungeRules={() => setIsLoungeRulesOpen(true)}
+          onOpenAppHub={() => setIsAppHubOpen(true)}
+          onOpenSpotify={() => setIsSpotifyOpen(true)}
+          onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+          onOpenVideoCall={() => startCall({ contactName: 'Live Video Meet', contactAvatar: '', type: 'video' })}
           notifications={notifications}
         />
 
@@ -806,6 +819,10 @@ function WorkspaceApp() {
         onQuickAI={(prompt) => {
           setActiveTab('assistant');
         }}
+        onOpenAppHub={() => setIsAppHubOpen(true)}
+        onOpenSpotify={() => setIsSpotifyOpen(true)}
+        onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+        onOpenVideoCall={() => startCall({ contactName: 'Live Video Meet', contactAvatar: '', type: 'video' })}
       />
 
       {/* Authentication Modal */}
@@ -847,6 +864,41 @@ function WorkspaceApp() {
 
       {/* Real-time Offline Connectivity Banner */}
       <OfflineIndicator />
+
+      {/* WebRTC Video Call Interface (Full Modal & Draggable Floating Picture-in-Picture) */}
+      <VideoCallInterface />
+
+      {/* Universal OS App Hub (Home for all apps: ChatGPT, Spotify, Google Workspace, Video Call, Canva, GitHub) */}
+      <OSAppHubModal
+        isOpen={isAppHubOpen}
+        onClose={() => setIsAppHubOpen(false)}
+        onOpenChatGPT={() => setActiveTab('assistant')}
+        onOpenSpotify={() => setIsSpotifyOpen(true)}
+        onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+        onOpenVideoCall={() => startCall({ contactName: 'Live Video Meet', contactAvatar: '', type: 'video' })}
+      />
+
+      {/* Persistent / Dockable Spotify Focus Music Player */}
+      <SpotifyOSPlayer
+        isOpen={isSpotifyOpen}
+        onClose={() => setIsSpotifyOpen(false)}
+      />
+
+      {/* Google Workspace Hub (Gmail, Drive, Calendar, Meet) */}
+      <GoogleWorkspaceModal
+        isOpen={isGoogleWorkspaceOpen}
+        onClose={() => setIsGoogleWorkspaceOpen(false)}
+        tasks={tasks}
+        notes={notes}
+        events={events}
+      />
+
+      {/* Global Floating AI Assistant Widget (ChatGPT & Gemini) */}
+      <FloatingAssistantWidget
+        tasks={tasks}
+        notes={notes}
+        onNavigateTab={(tab) => setActiveTab(tab as any)}
+      />
     </motion.div>
   );
 }

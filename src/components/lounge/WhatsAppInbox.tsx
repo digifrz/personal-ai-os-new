@@ -29,6 +29,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useVideoCall } from '../../context/VideoCallContext';
 import { DirectThreadItem, DirectMessageItem } from '../../types';
 import {
   subscribeDirectMessages,
@@ -105,6 +106,7 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
   onOpenUserProfile,
 }) => {
   const { user, profile } = useAuth();
+  const { startCall } = useVideoCall();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'unread' | 'groups'>('all');
@@ -602,17 +604,25 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
               <div className="flex items-center gap-1 text-[var(--color-muted)]">
                 <button
                   type="button"
-                  onClick={() => onShowToast(`Direct calling with ${displayedRecipientName} is currently offline.`)}
-                  className="p-2 rounded-full hover:bg-white/10 hover:text-[var(--color-text)] transition-colors"
-                  title="Video call"
+                  onClick={() => startCall({
+                    contactName: displayedRecipientName,
+                    contactAvatar: recipientAvatar,
+                    type: 'video',
+                  })}
+                  className="p-2 rounded-full hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-colors"
+                  title="Start Video Call"
                 >
                   <Video className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => onShowToast(`Audio calling with ${displayedRecipientName} is currently offline.`)}
-                  className="p-2 rounded-full hover:bg-white/10 hover:text-[var(--color-text)] transition-colors"
-                  title="Audio call"
+                  onClick={() => startCall({
+                    contactName: displayedRecipientName,
+                    contactAvatar: recipientAvatar,
+                    type: 'voice',
+                  })}
+                  className="p-2 rounded-full hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-colors"
+                  title="Start Audio Call"
                 >
                   <Phone className="w-4 h-4" />
                 </button>

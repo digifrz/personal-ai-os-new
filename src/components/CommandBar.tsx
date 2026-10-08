@@ -1,5 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Sparkles, CheckSquare, FileText, FolderKanban, Calendar, ArrowRight, X, Brain, Activity, Compass, Mic, MicOff } from 'lucide-react';
+import {
+  Search,
+  Sparkles,
+  CheckSquare,
+  FileText,
+  FolderKanban,
+  Calendar,
+  ArrowRight,
+  X,
+  Brain,
+  Activity,
+  Compass,
+  Mic,
+  MicOff,
+  Layers,
+  Music,
+  Video,
+  Mail,
+  Bot,
+} from 'lucide-react';
 import { ViewTab } from '../types';
 
 interface CommandBarProps {
@@ -9,6 +28,10 @@ interface CommandBarProps {
   onQuickTask?: (title: string) => void;
   onQuickAI?: (prompt: string) => void;
   onOpenTour?: () => void;
+  onOpenAppHub?: () => void;
+  onOpenSpotify?: () => void;
+  onOpenGoogleWorkspace?: () => void;
+  onOpenVideoCall?: () => void;
 }
 
 export const CommandBar: React.FC<CommandBarProps> = ({
@@ -18,6 +41,10 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   onQuickTask,
   onQuickAI,
   onOpenTour,
+  onOpenAppHub,
+  onOpenSpotify,
+  onOpenGoogleWorkspace,
+  onOpenVideoCall,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -165,6 +192,55 @@ export const CommandBar: React.FC<CommandBarProps> = ({
       icon: Activity,
       color: '#FDBA74',
       action: () => setActiveTab('activity'),
+    },
+    {
+      id: 'app_hub',
+      label: 'OS Apps Hub & Integrations',
+      hint: 'Home for ChatGPT, Spotify, Google Workspace, Video Calling, Canva, GitHub',
+      icon: Layers,
+      color: '#8B5CF6',
+      action: () => {
+        if (onOpenAppHub) onOpenAppHub();
+        else setActiveTab('settings');
+      },
+    },
+    {
+      id: 'spotify',
+      label: 'Spotify Focus Music Player',
+      hint: 'Stream Deep Focus, Lo-Fi beats, and ambient background music',
+      icon: Music,
+      color: '#1DB954',
+      action: () => {
+        if (onOpenSpotify) onOpenSpotify();
+      },
+    },
+    {
+      id: 'chatgpt',
+      label: 'ChatGPT External Assistant',
+      hint: 'Ask OpenAI GPT-4o or toggle multi-model consensus engine',
+      icon: Bot,
+      color: '#10B981',
+      action: () => setActiveTab('assistant'),
+    },
+    {
+      id: 'google_workspace',
+      label: 'Google Workspace Hub',
+      hint: 'Compose Gmail drafts, export Drive backups, sync Calendar & Meet',
+      icon: Mail,
+      color: '#EF4444',
+      action: () => {
+        if (onOpenGoogleWorkspace) onOpenGoogleWorkspace();
+      },
+    },
+    {
+      id: 'video_call',
+      label: 'Start Instant Video Meet',
+      hint: 'High-definition WebRTC video and audio call with screen sharing',
+      icon: Video,
+      color: '#6366F1',
+      action: () => {
+        if (onOpenVideoCall) onOpenVideoCall();
+      },
     },
   ];
 

@@ -8,8 +8,11 @@ import {
   Trash2,
   CheckCheck,
   Radio,
+  Phone,
+  Video,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useVideoCall } from '../../context/VideoCallContext';
 import { DirectThreadItem, DirectMessageItem } from '../../types';
 import {
   subscribeDirectMessages,
@@ -30,6 +33,7 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
   onShowToast,
 }) => {
   const { user, profile } = useAuth();
+  const { startCall } = useVideoCall();
   const otherUserId = thread.participants.find((p) => p !== user?.uid) || '';
   const recipientName = thread.participantNames[otherUserId] || 'Community Member';
   const recipientAvatar = thread.participantAvatars[otherUserId];
@@ -167,6 +171,30 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => startCall({
+              contactName: recipientName,
+              contactAvatar: recipientAvatar,
+              type: 'video',
+            })}
+            title="Start Video Call"
+            className="flex items-center gap-1 p-2 rounded-xl border border-[var(--color-border)] hover:bg-indigo-500/15 text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            <Video className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => startCall({
+              contactName: recipientName,
+              contactAvatar: recipientAvatar,
+              type: 'voice',
+            })}
+            title="Start Audio Call"
+            className="flex items-center gap-1 p-2 rounded-xl border border-[var(--color-border)] hover:bg-emerald-500/15 text-emerald-400 hover:text-emerald-300 transition-colors"
+          >
+            <Phone className="w-4 h-4" />
+          </button>
           <button
             type="button"
             onClick={() => {

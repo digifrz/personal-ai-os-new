@@ -34,6 +34,7 @@ import {
   Share2,
   RefreshCw,
   FolderOpen,
+  Key,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -149,6 +150,16 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   const [activeMode, setActiveMode] = useState<
     'chat' | 'suggest_tasks' | 'study_quiz' | 'code' | 'summarize'
   >('chat');
+  const [engine, setEngine] = useState<'gemini' | 'chatgpt'>('chatgpt');
+  const [openAiApiKey, setOpenAiApiKey] = useState(() => {
+    try {
+      return localStorage.getItem('user_openai_api_key') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [tempKey, setTempKey] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [attachedMediaList, setAttachedMediaList] = useState<AttachedMedia[]>([]);
@@ -523,6 +534,8 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       const aiReply = await askAI({
         prompt: userMsgText,
         mode: activeMode,
+        provider: engine,
+        openaiApiKey: openAiApiKey || undefined,
         context: workspaceContext,
         media: mediaPayload.length > 0 ? mediaPayload : undefined,
       });
@@ -983,8 +996,12 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                   <h2 className="font-extrabold text-sm sm:text-base text-[var(--color-text)] truncate">
                     {activeSession?.title || 'Personal AI Assistant'}
                   </h2>
-                  <span className="rounded-full bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 border border-cyan-500/30 px-2 py-0.5 text-[10px] font-bold text-cyan-400 shrink-0">
-                    Gemini 2.5 Flash
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold border shrink-0 ${
+                    engine === 'chatgpt'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                      : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-400'
+                  }`}>
+                    {engine === 'chatgpt' ? 'OpenAI GPT-4o' : 'Gemini 3.8 Flash'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-[var(--color-muted)] pt-0.5">
@@ -1000,8 +1017,53 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
               </div>
             </div>
 
-            {/* Top Bar Quick Controls */}
+            {/* Top Bar Quick Controls & AI Engine Selector */}
             <div className="flex items-center gap-2">
+              {/* Engine Toggle */}
+              <div className="flex items-center rounded-xl bg-[var(--color-bg-secondary)] p-0.5 border border-[var(--color-border)]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEngine('chatgpt');
+                    try { localStorage.setItem('assistant_preferred_engine', 'chatgpt'); } catch {}
+                  }}
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                    engine === 'chatgpt'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <span>🟢 ChatGPT</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEngine('gemini');
+                    try { localStorage.setItem('assistant_preferred_engine', 'gemini'); } catch {}
+                  }}
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                    engine === 'gemini'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  <span>🌟 Gemini</span>
+                </button>
+              </div>
+
+              {/* API Key Modal Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setTempKey(openAiApiKey);
+                  setShowApiKeyModal(true);
+                }}
+                title="Configure custom OpenAI API Key"
+                className="p-1.5 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-secondary)] text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+              >
+                <Key className="w-4 h-4 text-emerald-400" />
+              </button>
+
               <button
                 type="button"
                 onClick={handleCreateNewChat}
@@ -1319,6 +1381,76 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           </div>
         </main>
       </div>
+
+      {/* OpenAI API Key Configuration Modal */}
+      {showApiKeyModal && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+          onClick={() => setShowApiKeyModal(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4 shadow-2xl text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2.5">
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4 text-emerald-400" />
+                <h3 className="font-extrabold text-[var(--color-text)] text-sm">
+                  OpenAI API Key (Optional)
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiKeyModal(false)}
+                className="p-1 rounded-xl text-[var(--color-muted)] hover:text-[var(--color-text)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-[var(--color-muted)] leading-relaxed">
+              You can optionally connect your personal OpenAI API Key to directly bill GPT-4o queries to your OpenAI account. If left blank, the app uses the built-in universal bridge at zero cost!
+            </p>
+
+            <div>
+              <label className="block font-bold text-[var(--color-muted)] mb-1">
+                API Key (sk-...)
+              </label>
+              <input
+                type="password"
+                value={tempKey}
+                onChange={(e) => setTempKey(e.target.value)}
+                placeholder="sk-proj-..."
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-2.5 text-[var(--color-text)] outline-none font-mono"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[var(--color-border)]">
+              <button
+                type="button"
+                onClick={() => setShowApiKeyModal(false)}
+                className="rounded-xl px-3 py-1.5 text-[var(--color-muted)] hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenAiApiKey(tempKey.trim());
+                  try {
+                    localStorage.setItem('user_openai_api_key', tempKey.trim());
+                  } catch {}
+                  setShowApiKeyModal(false);
+                  showToast('OpenAI API Key updated!');
+                }}
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-1.5"
+              >
+                Save Key
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

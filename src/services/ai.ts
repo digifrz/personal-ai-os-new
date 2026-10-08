@@ -3,6 +3,8 @@ import { AppError } from '../lib/errors';
 export interface AskAIOptions {
   prompt: string;
   mode?: 'chat' | 'code' | 'image' | 'summarize' | 'suggest_tasks' | 'study_quiz' | 'weekly_review';
+  provider?: 'gemini' | 'openai' | 'chatgpt' | 'hybrid';
+  openaiApiKey?: string;
   context?: any;
   projectId?: string | null;
   media?: Array<{ data: string; mimeType: string; name?: string }>;

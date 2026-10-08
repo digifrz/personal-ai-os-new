@@ -3,6 +3,42 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="text/javascript">
+      // React Fast Refresh preamble safety initialization
+      // Ensures preamble stubs exist across all load conditions (Service Worker precache, offline, SSR, dev fallback)
+      if (typeof window !== 'undefined') {
+        window.$RefreshReg$ = window.$RefreshReg$ || function() {};
+        window.$RefreshSig$ = window.$RefreshSig$ || function() { return function(type) { return type; }; };
+        window.__vite_plugin_react_preamble_installed__ = true;
+      }
+    </script>
+    <script type="text/javascript">
+      // Filter benign Vite HMR WebSocket connection notices in AI Studio preview
+      (function() {
+        var isWsNotice = function(msg) {
+          if (!msg) return false;
+          var s = typeof msg === 'string' ? msg : (msg.message || '');
+          return s.indexOf('WebSocket') !== -1 || s.indexOf('failed to connect to websocket') !== -1 || s.indexOf('vite-hmr') !== -1;
+        };
+        var origError = console.error;
+        console.error = function() {
+          if (arguments.length > 0 && isWsNotice(arguments[0])) {
+            return;
+          }
+          return origError.apply(console, arguments);
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+          if (isWsNotice(event.reason)) {
+            event.preventDefault();
+          }
+        });
+        window.addEventListener('error', function(event) {
+          if (isWsNotice(event.message) || isWsNotice(event.error)) {
+            event.preventDefault();
+          }
+        });
+      })();
+    </script>
     <title>Personal AI OS</title>
     <meta name="description" content="Your private digital command center with workspace-aware AI, tasks, notes, files, calendar, goals, projects, learning, and community." />
     <meta property="og:title" content="Personal AI OS" />

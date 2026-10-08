@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, ArrowLeft, Globe } from 'lucide-react';
+import { X, Send, ArrowLeft, Globe, Video } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useVideoCall } from '../../context/VideoCallContext';
 import { CommunityChannelItem, CommunityMessageItem } from '../../types';
 import { subscribeChannelMessages, sendChannelMessage } from '../../services/db';
 
@@ -11,6 +12,7 @@ interface RoomChatModalProps {
 
 export const RoomChatModal: React.FC<RoomChatModalProps> = ({ room, onClose }) => {
   const { user, profile } = useAuth();
+  const { startCall } = useVideoCall();
   const [messages, setMessages] = useState<CommunityMessageItem[]>([]);
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -86,13 +88,28 @@ export const RoomChatModal: React.FC<RoomChatModalProps> = ({ room, onClose }) =
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-xl p-2 text-[var(--color-muted)] hover:text-[var(--color-text)]"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => startCall({
+              contactName: `${room.name} Live Room`,
+              contactAvatar: '',
+              type: 'video',
+            })}
+            title="Start Room Video Conference"
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 px-3 py-1.5 text-xs font-bold text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all shadow-sm"
+          >
+            <Video className="w-4 h-4" />
+            <span className="hidden sm:inline">Join Room Call</span>
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl p-2 text-[var(--color-muted)] hover:text-[var(--color-text)]"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
       </header>
 
       {/* Messages Stream */}

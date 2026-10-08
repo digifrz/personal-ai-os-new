@@ -22,6 +22,10 @@ import {
   Trash2,
   Briefcase,
   User,
+  Layers,
+  Music,
+  Video,
+  Mail,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ViewTab, NotificationItem } from '../types';
@@ -40,6 +44,10 @@ interface TopbarProps {
   onOpenAbout: () => void;
   onOpenAITopUp?: () => void;
   onOpenLoungeRules?: () => void;
+  onOpenAppHub?: () => void;
+  onOpenSpotify?: () => void;
+  onOpenGoogleWorkspace?: () => void;
+  onOpenVideoCall?: () => void;
   notifications: NotificationItem[];
 }
 
@@ -54,6 +62,10 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenAbout,
   onOpenAITopUp,
   onOpenLoungeRules,
+  onOpenAppHub,
+  onOpenSpotify,
+  onOpenGoogleWorkspace,
+  onOpenVideoCall,
   notifications,
 }) => {
   const { user, profile, logout, accountType, toggleAccountType } = useAuth();
@@ -235,6 +247,48 @@ export const Topbar: React.FC<TopbarProps> = ({
 
         {/* PWA Install Button */}
         <PWAInstallButton />
+
+        {/* App Hub & Integrations Button */}
+        {onOpenAppHub && (
+          <button
+            type="button"
+            id="topbar-app-hub-btn"
+            onClick={onOpenAppHub}
+            title="Open OS App Hub (ChatGPT, Spotify, Google Workspace, Canva, GitHub)"
+            className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2.5 sm:px-3 py-1.5 text-xs font-bold text-indigo-300 hover:border-indigo-500 hover:bg-indigo-500/20 transition-all shadow-sm group"
+          >
+            <Layers className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline">Apps Hub</span>
+          </button>
+        )}
+
+        {/* Spotify Quick Focus Player Button */}
+        {onOpenSpotify && (
+          <button
+            type="button"
+            id="topbar-spotify-btn"
+            onClick={onOpenSpotify}
+            title="Open Spotify Focus Player (Ambient Lo-Fi & Deep Work Music)"
+            className="flex items-center gap-1.5 rounded-xl border border-[#1DB954]/40 bg-[#1DB954]/10 p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold text-[#1DB954] hover:bg-[#1DB954]/20 transition-all shadow-sm group"
+          >
+            <Music className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+            <span className="hidden md:inline">Focus Music</span>
+          </button>
+        )}
+
+        {/* Instant Video Meet Button */}
+        {onOpenVideoCall && (
+          <button
+            type="button"
+            id="topbar-videocall-btn"
+            onClick={onOpenVideoCall}
+            title="Start Instant Video / Voice Call"
+            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 group"
+          >
+            <Video className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden md:inline">Video Meet</span>
+          </button>
+        )}
 
         {/* Guide & Policies button */}
         <button

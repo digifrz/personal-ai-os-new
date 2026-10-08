@@ -161,6 +161,8 @@ I am capable of executing real actions across your entire workspace:
 export interface AssistantRequestOptions {
   mode?: 'chat' | 'code' | 'image' | 'summarize' | 'suggest_tasks' | 'study_quiz' | 'weekly_review';
   prompt: string;
+  provider?: 'gemini' | 'openai' | 'chatgpt' | 'hybrid';
+  openaiApiKey?: string;
   context?: any;
   projectId?: string | null;
   media?: Array<{ data: string; mimeType: string; name?: string }>;
@@ -168,6 +170,7 @@ export interface AssistantRequestOptions {
 
 export async function processAssistantRequest(req: AssistantRequestOptions): Promise<string> {
   const mode = req.mode || 'chat';
+  const provider = req.provider || 'gemini';
 
   let systemInstruction = `You are Personal AI OS, an intelligent, calm, and proactive operating system assistant.
 You are directly integrated into the user's private digital workspace which contains tasks, notes, files, calendar events, goals, projects, learning materials (flashcards, subjects, quizzes), and AI memories.
@@ -186,6 +189,12 @@ The workspace will parse these action tags and execute them directly into the da
 When you identify a clear user preference or habit in their message (e.g. "I usually study best at 9 PM" or "I prefer keeping tasks short"), highlight it at the end with a special tag: [PREFERENCE: <summary>] so the system can offer to save it to their AI Memory.
 `;
 
+  if (provider === 'openai' || provider === 'chatgpt') {
+    systemInstruction = `You are ChatGPT (GPT-4o), operating as an external intelligent assistant seamlessly integrated into Personal AI OS.
+Provide clear, structured, well-formatted answers with ChatGPT's characteristic conciseness, structured markdown, and analytical depth.
+` + systemInstruction;
+  }
+
   if (mode === 'code') {
     systemInstruction += `\nMode: You are a senior software architect. Provide clean, production-ready code with concise explanations and appropriate syntax highlighting.`;
   } else if (mode === 'image') {
@@ -201,6 +210,38 @@ When you identify a clear user preference or habit in their message (e.g. "I usu
   }
 
   const fullPrompt = `${req.prompt}${contextString}`;
+
+  // If user requested OpenAI ChatGPT and supplied an API key (or process.env.OPENAI_API_KEY is present)
+  const openAiKey = req.openaiApiKey || process.env.OPENAI_API_KEY;
+  if ((provider === 'openai' || provider === 'chatgpt') && openAiKey) {
+    try {
+      const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openAiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: fullPrompt },
+          ],
+          temperature: mode === 'code' ? 0.2 : 0.7,
+        }),
+      });
+
+      if (openAiRes.ok) {
+        const data = await openAiRes.json();
+        const content = data.choices?.[0]?.message?.content;
+        if (content) {
+          return content;
+        }
+      }
+    } catch (err: any) {
+      console.warn('[AI Service] Direct OpenAI API request failed, falling back to universal engine:', err?.message || err);
+    }
+  }
 
   // Build multimodal contents payload if media is attached
   let contentsPayload: any = fullPrompt;

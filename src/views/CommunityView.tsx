@@ -59,6 +59,7 @@ import {
   toggleFollowUser,
 } from '../services/db';
 import { askAI } from '../services/ai';
+import { useVideoCall } from '../context/VideoCallContext';
 
 // Modals & Sub-views
 import { StoryViewerModal } from '../components/lounge/StoryViewerModal';
@@ -137,6 +138,7 @@ const SEED_PROFILES: UserProfile[] = [
 
 export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPosts, onNavigate }) => {
   const { user, profile, accountType, setAccountType } = useAuth();
+  const { startCall } = useVideoCall();
 
   // Navigation Tabs: The Lounge (Feed, Explore, Create, Inbox, Notifications, Profile, Rooms, People)
   const [activeTab, setActiveTab] = useState<
@@ -806,6 +808,19 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
             Connect, share updates, watch Pulses, and explore stories.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => startCall({
+            contactName: 'Lounge Live Room',
+            contactAvatar: '',
+            type: 'video',
+          })}
+          className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg hover:from-indigo-500 hover:to-purple-500 transition-all self-start sm:self-auto hover:scale-105 active:scale-95"
+        >
+          <VideoIcon className="w-4 h-4" />
+          <span>Start Instant Video Call</span>
+        </button>
       </header>
 
       {/* Hidden File Input for Story Upload */}
