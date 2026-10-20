@@ -35,8 +35,10 @@ import {
   RefreshCw,
   FolderOpen,
   Key,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { AISettingsModal } from '../components/assistant/AISettingsModal';
 import {
   AIChatMessage,
   TaskItem,
@@ -73,6 +75,7 @@ interface AssistantViewProps {
   events: CalendarEventItem[];
   memories?: AIMemoryItem[];
   aiMemoryEnabled?: boolean;
+  openNewChatTrigger?: number;
   onNavigate?: (tab: string) => void;
   onLogActivity?: (action: string, entityType: string, entityTitle: string, details?: string) => void;
 }
@@ -101,6 +104,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   events,
   memories = [],
   aiMemoryEnabled = true,
+  openNewChatTrigger = 0,
   onNavigate,
   onLogActivity,
 }) => {
@@ -159,6 +163,9 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     }
   });
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [showAISettingsModal, setShowAISettingsModal] = useState(false);
+  const [showMemoryDrawer, setShowMemoryDrawer] = useState(false);
+  const [newMemorySnippet, setNewMemorySnippet] = useState('');
   const [tempKey, setTempKey] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -419,6 +426,15 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     if (textareaRef.current) textareaRef.current.focus();
   };
 
+  // Auto-trigger fresh new chat session when requested externally (e.g. from Topbar Ask AI)
+  const lastTriggerRef = useRef(openNewChatTrigger);
+  useEffect(() => {
+    if (openNewChatTrigger > 0 && openNewChatTrigger !== lastTriggerRef.current) {
+      lastTriggerRef.current = openNewChatTrigger;
+      handleCreateNewChat();
+    }
+  }, [openNewChatTrigger]);
+
   // Delete a Chat Session
   const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -545,6 +561,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       const modelMsg: AIChatMessage = {
         id: 'msg_model_' + Date.now(),
         role: 'model',
+        provider: engine,
         text: aiReply,
         createdAt: new Date().toISOString(),
       };
@@ -570,6 +587,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       const fallbackMsg: AIChatMessage = {
         id: 'msg_fallback_' + Date.now(),
         role: 'model',
+        provider: engine,
         text: 'I have logged your request. You can review your open tasks and notes in the left navigation or ask another question!',
         createdAt: new Date().toISOString(),
       };
@@ -1051,6 +1069,33 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                 </button>
               </div>
 
+              {/* AI Memory Button inside Assistant UI */}
+              <button
+                type="button"
+                id="assistant-open-memory-btn"
+                onClick={() => setShowMemoryDrawer(!showMemoryDrawer)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm cursor-pointer ${
+                  showMemoryDrawer
+                    ? 'border-pink-500 bg-pink-500/20 text-pink-300 ring-2 ring-pink-500/30'
+                    : 'border-pink-500/30 bg-pink-500/10 text-pink-300 hover:bg-pink-500/20'
+                }`}
+                title="View & manage AI Long-Term Memory context"
+              >
+                <Brain className="w-3.5 h-3.5 text-pink-400" />
+                <span>Memory ({memories.length})</span>
+              </button>
+
+              {/* AI Settings Modal Button (Matching Images 4 & 5) */}
+              <button
+                type="button"
+                id="assistant-open-settings-btn"
+                onClick={() => setShowAISettingsModal(true)}
+                title="AI Assistant Settings (Models, Persona, Creativity, Tools)"
+                className="p-1.5 rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-secondary)] text-[var(--color-muted)] hover:text-purple-400 transition-colors cursor-pointer"
+              >
+                <SlidersHorizontal className="w-4 h-4 text-purple-400" />
+              </button>
+
               {/* API Key Modal Button */}
               <button
                 type="button"
@@ -1105,6 +1150,25 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                         : 'bg-[var(--color-primary)] text-white'
                     }`}
                   >
+                    {isModel && (
+                      <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-[var(--color-border)]/50">
+                        <div className="flex items-center gap-1.5">
+                          {msg.provider === 'chatgpt' ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 px-2 py-0.5 text-[10px] font-extrabold text-emerald-300">
+                              <span>🟢 ChatGPT (GPT-4o)</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 border border-indigo-500/35 px-2 py-0.5 text-[10px] font-extrabold text-indigo-300">
+                              <span>🌟 Gemini 3.8 Flash</span>
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-[var(--color-muted)]">
+                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="whitespace-pre-wrap select-text leading-relaxed font-sans">
                       {msg.text}
                     </div>
@@ -1448,6 +1512,134 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                 Save Key
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Assistant Settings Modal (Images 4 & 5) */}
+      <AISettingsModal
+        isOpen={showAISettingsModal}
+        onClose={() => setShowAISettingsModal(false)}
+        onShowToast={showToast}
+      />
+
+      {/* Slide-Over AI Memory Drawer */}
+      {showMemoryDrawer && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setShowMemoryDrawer(false)}
+        >
+          <div
+            className="w-full max-w-md h-full bg-[var(--color-surface)] border-l border-[var(--color-border)] p-5 shadow-2xl flex flex-col space-y-4 animate-slide-left text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-xl bg-pink-500/20 text-pink-400">
+                  <Brain className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm text-[var(--color-text)]">
+                    AI Memory &amp; Knowledge Context
+                  </h3>
+                  <span className="text-[10px] text-[var(--color-muted)]">
+                    {memories.length} active persistent fact(s)
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowMemoryDrawer(false)}
+                className="p-1 rounded-xl text-[var(--color-muted)] hover:text-[var(--color-text)]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Add Fact Input */}
+            <div className="p-3 rounded-2xl border border-pink-500/30 bg-pink-500/5 space-y-2">
+              <span className="font-bold text-[var(--color-text)] block">
+                + Teach Assistant a New Fact
+              </span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. My primary deadline is Nov 1st..."
+                  value={newMemorySnippet}
+                  onChange={(e) => setNewMemorySnippet(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && newMemorySnippet.trim()) {
+                      await handleSaveToMemory(newMemorySnippet.trim());
+                      setNewMemorySnippet('');
+                    }
+                  }}
+                  className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-1.5 text-xs text-[var(--color-text)] outline-none focus:border-pink-500"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!newMemorySnippet.trim()) return;
+                    await handleSaveToMemory(newMemorySnippet.trim());
+                    setNewMemorySnippet('');
+                  }}
+                  className="rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold px-3 py-1.5 text-xs transition-colors shrink-0"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+
+            {/* Memories List */}
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+              {memories.length === 0 ? (
+                <div className="p-6 text-center text-zinc-500 space-y-2">
+                  <Brain className="w-8 h-8 mx-auto opacity-40 text-pink-400" />
+                  <p>No memories recorded yet.</p>
+                  <p className="text-[10px]">
+                    Teach the assistant your preferences, work style, or project goals above!
+                  </p>
+                </div>
+              ) : (
+                memories.map((m) => (
+                  <div
+                    key={m.id}
+                    className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1 hover:border-pink-500/40 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <strong className="font-bold text-[var(--color-text)] truncate">
+                        {m.title || 'Workspace Memory'}
+                      </strong>
+                      <span className="text-[9px] font-bold text-pink-400 bg-pink-500/15 px-2 py-0.5 rounded-full shrink-0 ml-2">
+                        {m.type || 'Fact'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
+                      {m.content}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer */}
+            {onNavigate && (
+              <div className="pt-2 border-t border-[var(--color-border)] flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMemoryDrawer(false);
+                    onNavigate('memory');
+                  }}
+                  className="text-pink-400 hover:underline font-bold text-xs flex items-center gap-1"
+                >
+                  <span>Open Full AI Memory Vault →</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

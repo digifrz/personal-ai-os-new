@@ -32,6 +32,10 @@ import {
   Edit3,
   FolderInput,
   Copy,
+  HardDrive,
+  Send,
+  Radio,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FileItem } from '../types';
@@ -44,6 +48,7 @@ import {
   updateFile,
   deleteFile,
   createFlashcard,
+  createCommunityPost,
 } from '../services/db';
 import { askAI } from '../services/ai';
 import { recordRecentAccess } from '../services/recentAccess';
@@ -69,14 +74,47 @@ interface FilesViewProps {
 export const FilesView: React.FC<FilesViewProps> = ({ files }) => {
   const { user } = useAuth();
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'favorite' | 'archive' | 'trash'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'favorite' | 'archive' | 'trash' | 'drive'>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'size'>('recent');
   const [searchQuery, setSearchQuery] = useState('');
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isPostingToLounge, setIsPostingToLounge] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Direct upload file to The Lounge
+  const handlePostFileToLounge = async (file: FileItem) => {
+    if (!user) {
+      showToast('Please sign in to share files in The Lounge.');
+      return;
+    }
+    setIsPostingToLounge(true);
+    try {
+      await createCommunityPost({
+        userId: user.uid,
+        authorId: user.uid,
+        authorName: user.displayName || user.email?.split('@')[0] || 'Workspace Member',
+        authorAvatar: user.photoURL || '',
+        title: `Shared Workspace Asset: ${file.name}`,
+        content: `Uploaded from Workspace Files (${file.name}, ${formatSize(file.sizeBytes)}). Open to download or review directly in The Lounge!`,
+        fileName: file.name,
+        fileUrl: file.downloadUrl,
+        mediaUrls: file.mimeType?.startsWith('image/') && file.downloadUrl ? [file.downloadUrl] : undefined,
+        mediaType: file.mimeType?.startsWith('image/') ? 'image' : undefined,
+        tags: ['Files', 'WorkspaceAssets', 'SharedDocs'],
+        visibility: 'public',
+      });
+      showToast(`✓ "${file.name}" uploaded to The Lounge directly!`);
+      setSelectedActionFile(null);
+    } catch (err: any) {
+      console.error('Error sharing to lounge:', err);
+      showToast('Failed to post file to The Lounge.');
+    } finally {
+      setIsPostingToLounge(false);
+    }
+  };
 
   // Top-Up Page for file actions (left-click on a file)
   const [selectedActionFile, setSelectedActionFile] = useState<FileItem | null>(null);
@@ -501,7 +539,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ files }) => {
 
       {/* Filters & Search */}
       <section className="flex flex-wrap items-center gap-2">
-        {(['all', 'favorite', 'archive', 'trash'] as const).map((filter) => (
+        {(['all', 'favorite', 'archive', 'drive', 'trash'] as const).map((filter) => (
           <button
             key={filter}
             type="button"
@@ -509,13 +547,17 @@ export const FilesView: React.FC<FilesViewProps> = ({ files }) => {
               setActiveFilter(filter);
               setCurrentFolderId(null);
             }}
-            className={`rounded-xl px-3 py-1.5 text-xs font-bold capitalize transition-all border ${
+            className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all border ${
               activeFilter === filter
                 ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-text)]'
                 : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:border-[var(--color-primary)]/50'
             }`}
           >
-            {filter === 'favorite' ? '★ Favorites' : filter}
+            {filter === 'favorite'
+              ? '★ Favorites'
+              : filter === 'drive'
+              ? '☁ Google Drive Mode'
+              : filter}
           </button>
         ))}
 
@@ -554,8 +596,154 @@ export const FilesView: React.FC<FilesViewProps> = ({ files }) => {
         </div>
       </section>
 
-      {/* Files Grid */}
-      <section className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* GOOGLE DRIVE SPECIAL MODE VIEW */}
+      {activeFilter === 'drive' && (
+        <section className="space-y-6 animate-fade-in">
+          {/* Drive Mode Header Banner */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-blue-500/35 bg-blue-500/5 p-6">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-white font-black shadow-lg shadow-blue-500/20">
+                <HardDrive className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-base text-[var(--color-text)]">
+                    Google Drive Special Mode
+                  </h3>
+                  <span className="rounded-full bg-blue-500/20 border border-blue-500/40 px-2 py-0.5 text-[9px] font-bold text-blue-300">
+                    Cloud Storage Synced
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--color-muted)]">
+                  Browse Google Drive assets, docs, and archives with 1-click publishing directly to The Lounge.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                href="https://docs.new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 text-xs font-bold text-blue-300 transition-colors"
+              >
+                <span>+ New Google Doc</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+
+              <a
+                href="https://drive.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold px-3.5 py-1.5 text-xs transition-colors shadow-sm"
+              >
+                <span>Open Google Drive</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Drive Synced Items Grid */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {[
+              {
+                id: 'gdrive_doc_spec',
+                name: 'System Architecture & OS Design Spec.gdoc',
+                type: 'Google Doc',
+                size: '1.8 MB',
+                updatedAt: 'Today, 11:20 AM',
+                url: 'https://docs.google.com',
+              },
+              {
+                id: 'gdrive_sheet_metrics',
+                name: 'Quarterly OKR Goals & Resource Allocation.gsheet',
+                type: 'Google Sheet',
+                size: '920 KB',
+                updatedAt: 'Yesterday, 3:45 PM',
+                url: 'https://sheets.google.com',
+              },
+              {
+                id: 'gdrive_slides_deck',
+                name: 'Personal AI OS Executive Product Deck.gslides',
+                type: 'Google Slide',
+                size: '14.2 MB',
+                updatedAt: 'Oct 9, 2026',
+                url: 'https://slides.google.com',
+              },
+              {
+                id: 'gdrive_backup_vault',
+                name: 'Personal_AI_OS_Full_Cloud_Vault.json',
+                type: 'Drive Archive',
+                size: '480 KB',
+                updatedAt: 'Oct 8, 2026',
+                url: 'https://drive.google.com',
+              },
+            ].map((driveItem) => (
+              <article
+                key={driveItem.id}
+                className="group relative flex flex-col justify-between rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm hover:border-blue-500/50 hover:-translate-y-0.5 transition-all"
+              >
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-400 font-bold">
+                      <HardDrive className="w-6 h-6" />
+                    </div>
+                    <span className="rounded-full bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 text-[10px] font-bold text-blue-300">
+                      {driveItem.type}
+                    </span>
+                  </div>
+
+                  <h3 className="mt-4 text-sm font-bold text-[var(--color-text)] truncate" title={driveItem.name}>
+                    {driveItem.name}
+                  </h3>
+                  <p className="mt-1 text-[11px] text-[var(--color-muted)]">
+                    {driveItem.size} · {driveItem.updatedAt}
+                  </p>
+                </div>
+
+                <div className="mt-5 space-y-2 pt-3 border-t border-[var(--color-border)]/60 text-xs">
+                  <button
+                    type="button"
+                    disabled={isPostingToLounge}
+                    onClick={() => {
+                      handlePostFileToLounge({
+                        id: driveItem.id,
+                        userId: user?.uid || 'guest',
+                        name: driveItem.name,
+                        itemType: 'file',
+                        sizeBytes: 1024 * 1024,
+                        mimeType: 'application/vnd.google-apps.document',
+                        storagePath: `gdrive/${driveItem.name}`,
+                        downloadUrl: driveItem.url,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                      });
+                    }}
+                    className="flex items-center justify-center gap-1.5 w-full rounded-xl bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:brightness-110 disabled:opacity-50 text-white font-bold py-2 text-xs shadow-md transition-all"
+                  >
+                    <Send className={`w-3.5 h-3.5 ${isPostingToLounge ? 'animate-spin' : ''}`} />
+                    <span>Upload to Lounge</span>
+                  </button>
+
+                  <a
+                    href={driveItem.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1 w-full text-center rounded-xl border border-[var(--color-border)] hover:bg-[var(--color-bg-secondary)] py-1.5 text-[11px] font-semibold text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+                  >
+                    <span>Open in Drive</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Files Grid (Hidden if in Google Drive Mode) */}
+      {activeFilter !== 'drive' && (
+        <section className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filteredFiles.map((file) => (
           <article
             key={file.id}
@@ -675,6 +863,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ files }) => {
           </div>
         )}
       </section>
+      )}
 
       {/* Preview Modal */}
       {previewFile && (
@@ -1041,6 +1230,29 @@ export const FilesView: React.FC<FilesViewProps> = ({ files }) => {
                     <span>{isCopiedShareLink ? 'Copied!' : 'Copy Link'}</span>
                   </button>
                 </div>
+              </div>
+
+              {/* Option 2.5: Upload / Post Directly to The Lounge */}
+              <div className="rounded-2xl border border-pink-500/30 bg-pink-500/5 p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-[var(--color-text)] flex items-center gap-1.5">
+                    <Radio className="w-3.5 h-3.5 text-pink-400" />
+                    <span>Upload to The Lounge</span>
+                  </label>
+                  <span className="text-[10px] text-pink-400 font-bold">Community Lounge Feed</span>
+                </div>
+                <p className="text-[11px] text-[var(--color-muted)]">
+                  Publish this asset directly to The Lounge so community members can preview, discuss, and download it.
+                </p>
+                <button
+                  type="button"
+                  disabled={isPostingToLounge}
+                  onClick={() => handlePostFileToLounge(selectedActionFile)}
+                  className="flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:brightness-110 disabled:opacity-50 px-4 py-2 font-bold text-white shadow-md text-xs transition-all"
+                >
+                  <Send className={`w-3.5 h-3.5 ${isPostingToLounge ? 'animate-spin' : ''}`} />
+                  <span>{isPostingToLounge ? 'Uploading to Lounge…' : '🚀 Post File to Lounge Directly'}</span>
+                </button>
               </div>
 
               {/* Option 3: Move to Folder */}

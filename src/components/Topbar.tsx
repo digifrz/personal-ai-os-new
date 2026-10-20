@@ -26,8 +26,18 @@ import {
   Music,
   Video,
   Mail,
+  Mic,
+  LayoutGrid,
+  Sun,
+  Crown,
+  Waves,
+  Dices,
+  Flame,
+  ShieldAlert,
+  DollarSign,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useWindowManager } from '../context/WindowManagerContext';
 import { ViewTab, NotificationItem } from '../types';
 import { markAllNotificationsRead, markNotificationRead } from '../services/db';
 import { AccountSwitcher } from './AccountSwitcher';
@@ -43,11 +53,19 @@ interface TopbarProps {
   onOpenAuth: () => void;
   onOpenAbout: () => void;
   onOpenAITopUp?: () => void;
+  onOpenDailyBriefing?: () => void;
+  onOpenUpgrade?: () => void;
+  onOpenRoastHype?: () => void;
+  onOpenDecisionWheel?: () => void;
+  onOpenSoundscape?: () => void;
+  onOpenEmergencyFocus?: () => void;
   onOpenLoungeRules?: () => void;
   onOpenAppHub?: () => void;
   onOpenSpotify?: () => void;
   onOpenGoogleWorkspace?: () => void;
   onOpenVideoCall?: () => void;
+  onToggleVoiceListener?: () => void;
+  isVoiceListening?: boolean;
   notifications: NotificationItem[];
 }
 
@@ -61,14 +79,23 @@ export const Topbar: React.FC<TopbarProps> = ({
   onOpenAuth,
   onOpenAbout,
   onOpenAITopUp,
+  onOpenDailyBriefing,
+  onOpenUpgrade,
+  onOpenRoastHype,
+  onOpenDecisionWheel,
+  onOpenSoundscape,
+  onOpenEmergencyFocus,
   onOpenLoungeRules,
   onOpenAppHub,
   onOpenSpotify,
   onOpenGoogleWorkspace,
   onOpenVideoCall,
+  onToggleVoiceListener,
+  isVoiceListening,
   notifications,
 }) => {
-  const { user, profile, logout, accountType, toggleAccountType } = useAuth();
+  const { user, profile, logout, accountType, toggleAccountType, premiumStatus } = useAuth();
+  const windowManager = useWindowManager();
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -231,36 +258,24 @@ export const Topbar: React.FC<TopbarProps> = ({
           <Search className="w-4 h-4" />
         </button>
 
-        {/* Rules & Privacy button shown ONLY when visiting The Lounge */}
-        {activeTab === 'community' && onOpenLoungeRules && (
-          <button
-            type="button"
-            id="topbar-lounge-rules-btn"
-            onClick={onOpenLoungeRules}
-            title="Lounge community guidelines, safety & privacy rules"
-            className="flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 hover:border-emerald-500/60 transition-all shadow-sm animate-fade-in"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Rules &amp; Privacy</span>
-          </button>
-        )}
 
         {/* PWA Install Button */}
         <PWAInstallButton />
 
-        {/* App Hub & Integrations Button */}
-        {onOpenAppHub && (
+        {/* Daily Executive Briefing Button */}
+        {onOpenDailyBriefing && (
           <button
             type="button"
-            id="topbar-app-hub-btn"
-            onClick={onOpenAppHub}
-            title="Open OS App Hub (ChatGPT, Spotify, Google Workspace, Canva, GitHub)"
-            className="flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2.5 sm:px-3 py-1.5 text-xs font-bold text-indigo-300 hover:border-indigo-500 hover:bg-indigo-500/20 transition-all shadow-sm group"
+            id="topbar-daily-briefing-btn"
+            onClick={onOpenDailyBriefing}
+            title="Open Autonomous Morning / Evening AI Executive Briefing"
+            className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-2.5 sm:px-3 py-1.5 text-xs font-bold text-amber-300 hover:border-amber-500 hover:bg-amber-500/20 transition-all shadow-sm group"
           >
-            <Layers className="w-3.5 h-3.5 text-indigo-400 group-hover:scale-110 transition-transform" />
-            <span className="hidden sm:inline">Apps Hub</span>
+            <Sun className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline">Daily Brief</span>
           </button>
         )}
+
 
         {/* Spotify Quick Focus Player Button */}
         {onOpenSpotify && (
@@ -276,31 +291,25 @@ export const Topbar: React.FC<TopbarProps> = ({
           </button>
         )}
 
-        {/* Instant Video Meet Button */}
-        {onOpenVideoCall && (
+        {/* Global Web Speech Voice Control Button */}
+        {onToggleVoiceListener && (
           <button
             type="button"
-            id="topbar-videocall-btn"
-            onClick={onOpenVideoCall}
-            title="Start Instant Video / Voice Call"
-            className="p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 group"
+            id="topbar-voice-listener-btn"
+            onClick={onToggleVoiceListener}
+            title={isVoiceListening ? "Voice commands active (Press V to stop)" : "Start Voice Commands (Press V)"}
+            className={`flex items-center gap-1.5 rounded-xl border p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold transition-all shadow-sm group ${
+              isVoiceListening
+                ? 'border-violet-500 bg-violet-500/25 text-violet-300 ring-2 ring-violet-500/30'
+                : 'border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20'
+            }`}
           >
-            <Video className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
-            <span className="hidden md:inline">Video Meet</span>
+            <Mic className={`w-3.5 h-3.5 text-violet-400 group-hover:scale-110 transition-transform ${isVoiceListening ? 'animate-pulse text-red-400' : ''}`} />
+            <span className="hidden md:inline">{isVoiceListening ? 'Listening...' : 'Voice Control'}</span>
           </button>
         )}
 
-        {/* Guide & Policies button */}
-        <button
-          type="button"
-          id="topbar-guide-policies-btn"
-          onClick={onOpenAbout}
-          title="Learn what this app does, explore features & privacy policies"
-          className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-[var(--color-muted)] hover:border-emerald-500/50 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all shadow-sm"
-        >
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">Guide &amp; Policies</span>
-        </button>
+
 
         {/* Ask AI Top-Up Pop-up button */}
         <button
@@ -377,6 +386,40 @@ export const Topbar: React.FC<TopbarProps> = ({
               >
                 <Calendar className="w-4 h-4 text-pink-400" />
                 <span>Schedule Event</span>
+              </button>
+              <div className="my-1 border-t border-[var(--color-border)]/50" />
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPlusMenu(false);
+                  setActiveTab('vision');
+                }}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[var(--color-muted)] hover:bg-white/5 hover:text-[var(--color-text)] transition-colors"
+              >
+                <Sparkles className="w-4 h-4 text-pink-400" />
+                <span>Vision Board Pin</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPlusMenu(false);
+                  setActiveTab('habits');
+                }}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[var(--color-muted)] hover:bg-white/5 hover:text-[var(--color-text)] transition-colors"
+              >
+                <Flame className="w-4 h-4 text-orange-400" />
+                <span>Track Habits</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPlusMenu(false);
+                  setActiveTab('finance');
+                }}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-medium text-[var(--color-muted)] hover:bg-white/5 hover:text-[var(--color-text)] transition-colors"
+              >
+                <DollarSign className="w-4 h-4 text-emerald-400" />
+                <span>Log Finance</span>
               </button>
             </div>
           )}
@@ -585,6 +628,36 @@ export const Topbar: React.FC<TopbarProps> = ({
                     {user.email}
                   </small>
                 </div>
+
+                {/* Subscription Tier Button inside Profile Menu */}
+                {onOpenUpgrade && (
+                  <button
+                    type="button"
+                    id="topbar-user-menu-upgrade-btn"
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      onOpenUpgrade();
+                    }}
+                    className={`flex w-full items-center justify-between rounded-xl p-2.5 text-xs font-semibold border transition-all ${
+                      premiumStatus.isExecutive
+                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+                        : premiumStatus.isPro
+                        ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20'
+                        : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-amber-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Crown className={`w-4 h-4 ${premiumStatus.isPro ? 'text-amber-400' : 'text-[var(--color-muted)]'}`} />
+                      <div className="text-left">
+                        <span className="block text-[10px] text-[var(--color-muted)] font-normal leading-tight">Plan Status</span>
+                        <strong className="block text-xs font-bold capitalize text-[var(--color-text)]">{premiumStatus.tier} Tier</strong>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-400 bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 rounded-md">
+                      {premiumStatus.isExecutive ? 'Executive' : premiumStatus.isPro ? 'Pro' : 'Upgrade'}
+                    </span>
+                  </button>
+                )}
 
                 <button
                   type="button"

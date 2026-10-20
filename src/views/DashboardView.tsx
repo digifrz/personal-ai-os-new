@@ -14,8 +14,15 @@ import {
   Plus,
   Settings2,
   CloudSun,
+  Waves,
+  Dices,
+  ShieldAlert,
+  Zap,
+  Sun,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { WellnessWidget } from '../components/common/WellnessWidget';
+import { NewUserWelcomeGuide } from '../components/common/NewUserWelcomeGuide';
 import {
   TaskItem,
   NoteItem,
@@ -36,6 +43,11 @@ interface DashboardViewProps {
   onOpenNewTask: () => void;
   onOpenNewNote: () => void;
   onOpenNewEvent: () => void;
+  onOpenRoastHype?: () => void;
+  onOpenDecisionWheel?: () => void;
+  onOpenSoundscape?: () => void;
+  onOpenEmergencyFocus?: () => void;
+  onOpenDailyBriefing?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -48,6 +60,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenNewTask,
   onOpenNewNote,
   onOpenNewEvent,
+  onOpenRoastHype,
+  onOpenDecisionWheel,
+  onOpenSoundscape,
+  onOpenEmergencyFocus,
+  onOpenDailyBriefing,
 }) => {
   const { profile, user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -121,6 +138,154 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Settings2 className="w-4 h-4 text-[var(--color-primary)]" />
             <span className="hidden sm:inline">Customize widgets</span>
           </button>
+        </div>
+      </section>
+
+      {/* New User First & Second Time Welcome Guide */}
+      <NewUserWelcomeGuide
+        onNavigate={setActiveTab}
+        onOpenDailyBriefing={onOpenDailyBriefing}
+      />
+
+      {/* Next-Gen Power Tools & Anti-Procrastination Launchpad */}
+      <section className="rounded-3xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/20 via-[var(--color-surface)] to-violet-950/20 p-4 sm:p-5 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-xl bg-indigo-500/20 text-indigo-400">
+              <Zap className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-xs sm:text-sm font-extrabold text-[var(--color-text)] tracking-tight">
+                Next-Gen Power &amp; Accountability Protocols
+              </h2>
+              <p className="text-[10px] text-[var(--color-muted)] font-mono">
+                AI Roaster · Decision Wheel · Spatial Audio · Single-Task Lockdown
+              </p>
+            </div>
+          </div>
+          <span className="hidden sm:inline text-[10px] uppercase font-bold tracking-wider text-indigo-400 font-mono">
+            Next-Gen Active
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {onOpenDailyBriefing && (
+            <button
+              type="button"
+              onClick={onOpenDailyBriefing}
+              className="flex items-center gap-2.5 p-3 rounded-2xl bg-[var(--color-surface)] hover:bg-amber-500/10 border border-[var(--color-border)] hover:border-amber-500/40 text-left transition-all group"
+            >
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 group-hover:scale-110 transition-transform">
+                <Sun className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[var(--color-text)] group-hover:text-amber-300 truncate">
+                  Daily Briefing
+                </p>
+                <span className="text-[10px] text-[var(--color-muted)] truncate block">
+                  Morning &amp; evening audio
+                </span>
+              </div>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('vision')}
+            className="flex items-center gap-2.5 p-3 rounded-2xl bg-[var(--color-surface)] hover:bg-pink-500/10 border border-[var(--color-border)] hover:border-pink-500/40 text-left transition-all group"
+          >
+            <div className="p-2 rounded-xl bg-pink-500/20 text-pink-400 group-hover:scale-110 transition-transform">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-[var(--color-text)] group-hover:text-pink-300 truncate">
+                Vision Board
+              </p>
+              <span className="text-[10px] text-[var(--color-muted)] truncate block">
+                AI visual aspirations
+              </span>
+            </div>
+          </button>
+
+          {onOpenRoastHype && (
+            <button
+              type="button"
+              onClick={onOpenRoastHype}
+              className="flex items-center gap-2.5 p-3 rounded-2xl bg-[var(--color-surface)] hover:bg-rose-500/10 border border-[var(--color-border)] hover:border-rose-500/40 text-left transition-all group"
+            >
+              <div className="p-2 rounded-xl bg-rose-500/20 text-rose-400 group-hover:scale-110 transition-transform">
+                <Flame className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[var(--color-text)] group-hover:text-rose-300 truncate">
+                  AI Roast / Hype
+                </p>
+                <span className="text-[10px] text-[var(--color-muted)] truncate block">
+                  Wake-up accountability
+                </span>
+              </div>
+            </button>
+          )}
+
+          {onOpenDecisionWheel && (
+            <button
+              type="button"
+              onClick={onOpenDecisionWheel}
+              className="flex items-center gap-2.5 p-3 rounded-2xl bg-[var(--color-surface)] hover:bg-violet-500/10 border border-[var(--color-border)] hover:border-violet-500/40 text-left transition-all group"
+            >
+              <div className="p-2 rounded-xl bg-violet-500/20 text-violet-400 group-hover:scale-110 transition-transform">
+                <Dices className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[var(--color-text)] group-hover:text-violet-300 truncate">
+                  Destiny Wheel
+                </p>
+                <span className="text-[10px] text-[var(--color-muted)] truncate block">
+                  Break decision gridlock
+                </span>
+              </div>
+            </button>
+          )}
+
+          {onOpenSoundscape && (
+            <button
+              type="button"
+              onClick={onOpenSoundscape}
+              className="flex items-center gap-2.5 p-3 rounded-2xl bg-[var(--color-surface)] hover:bg-cyan-500/10 border border-[var(--color-border)] hover:border-cyan-500/40 text-left transition-all group"
+            >
+              <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400 group-hover:scale-110 transition-transform">
+                <Waves className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[var(--color-text)] group-hover:text-cyan-300 truncate">
+                  Spatial Audio
+                </p>
+                <span className="text-[10px] text-[var(--color-muted)] truncate block">
+                  Rain &amp; 432Hz waves
+                </span>
+              </div>
+            </button>
+          )}
+
+          {onOpenEmergencyFocus && (
+            <button
+              type="button"
+              onClick={onOpenEmergencyFocus}
+              className="flex items-center gap-2.5 p-3 rounded-2xl bg-[var(--color-surface)] hover:bg-red-500/10 border border-[var(--color-border)] hover:border-red-500/40 text-left transition-all group"
+            >
+              <div className="p-2 rounded-xl bg-red-500/20 text-red-400 group-hover:scale-110 transition-transform">
+                <ShieldAlert className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[var(--color-text)] group-hover:text-red-300 truncate">
+                  Focus Lockdown
+                </p>
+                <span className="text-[10px] text-[var(--color-muted)] truncate block">
+                  25m Pomodoro Protocol
+                </span>
+              </div>
+            </button>
+          )}
         </div>
       </section>
 
@@ -310,6 +475,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return null;
             })}
         </div>
+      </section>
+
+      {/* Daily Wellness, Hydration & Screen Break Companion */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-extrabold uppercase tracking-widest text-[var(--color-muted)]">
+            Daily Wellness &amp; Focus Intervals
+          </h2>
+          <span className="text-xs text-[var(--color-muted)]">Hydration &amp; Eye Protection</span>
+        </div>
+        <WellnessWidget />
       </section>
 
       {/* AI Daily Brain Section */}

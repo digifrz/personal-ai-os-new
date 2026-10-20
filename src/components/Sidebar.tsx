@@ -25,6 +25,10 @@ import {
   X,
   User as UserIcon,
   RefreshCw,
+  Book,
+  Layers,
+  Flame,
+  DollarSign,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ViewTab } from '../types';
@@ -37,6 +41,9 @@ interface SidebarProps {
   onOpenAbout: () => void;
   onForceRefresh?: () => void;
   isSyncing?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  onOpenIntegrations?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -46,26 +53,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenAbout,
   onForceRefresh,
   isSyncing = false,
+  isCollapsed: externalCollapsed,
+  onToggleCollapse,
+  onOpenIntegrations,
 }) => {
   const { user, profile, logout } = useAuth();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  const isCollapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
 
   useEffect(() => {
     const savedState = localStorage.getItem('personal-ai-os-sidebar-state');
     if (savedState === 'collapsed') {
-      setIsCollapsed(true);
+      setInternalCollapsed(true);
     }
   }, []);
 
   const toggleCollapse = () => {
-    const nextState = !isCollapsed;
-    setIsCollapsed(nextState);
-    localStorage.setItem('personal-ai-os-sidebar-state', nextState ? 'collapsed' : 'expanded');
+    if (onToggleCollapse) {
+      onToggleCollapse();
+    } else {
+      const nextState = !internalCollapsed;
+      setInternalCollapsed(nextState);
+      localStorage.setItem('personal-ai-os-sidebar-state', nextState ? 'collapsed' : 'expanded');
+    }
   };
 
   const handleNavClick = (tab: ViewTab) => {
-    setActiveTab(tab);
+    if (tab === 'integrations' && onOpenIntegrations) {
+      onOpenIntegrations();
+    } else {
+      setActiveTab(tab);
+    }
     setIsMobileOpen(false);
   };
 
@@ -75,18 +95,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       links: [
         { id: 'dashboard' as ViewTab, label: 'Dashboard', icon: LayoutDashboard, color: '#8B5CF6' },
         { id: 'search' as ViewTab, label: 'Search', icon: Search, color: '#22D3EE' },
+        { id: 'integrations' as ViewTab, label: 'Integrations', icon: Layers, color: '#6366F1' },
       ],
     },
     {
-      label: 'Community',
+      label: 'Lounge',
       links: [
-        { id: 'community' as ViewTab, label: 'Community', icon: Users, color: '#F472B6' },
+        { id: 'community' as ViewTab, label: 'Lounge', icon: Users, color: '#F472B6' },
       ],
     },
     {
       label: 'Productivity',
       links: [
+        { id: 'habits' as ViewTab, label: 'Habits & Streaks', icon: Flame, color: '#F97316' },
         { id: 'notes' as ViewTab, label: 'Notes', icon: FileText, color: '#F59E0B' },
+        { id: 'diary' as ViewTab, label: 'Diary & Journal', icon: Book, color: '#A855F7' },
         { id: 'files' as ViewTab, label: 'Files', icon: FolderKanban, color: '#60A5FA' },
         { id: 'tasks' as ViewTab, label: 'Tasks', icon: CheckSquare, color: '#34D399' },
         { id: 'calendar' as ViewTab, label: 'Calendar', icon: Calendar, color: '#F472B6' },
@@ -101,6 +124,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       label: 'Planning',
       links: [
+        { id: 'vision' as ViewTab, label: 'Vision Board', icon: Sparkles, color: '#EC4899' },
+        { id: 'finance' as ViewTab, label: 'Finance & Budget', icon: DollarSign, color: '#10B981' },
         { id: 'goals' as ViewTab, label: 'Goals', icon: Target, color: '#FBBF24' },
         { id: 'projects' as ViewTab, label: 'Projects', icon: FolderKanban, color: '#38BDF8' },
         { id: 'analytics' as ViewTab, label: 'Analytics', icon: BarChart3, color: '#4ADE80' },

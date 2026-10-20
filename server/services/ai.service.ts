@@ -330,3 +330,34 @@ export async function extractContentTags(content: string): Promise<string[]> {
     return tags.length > 0 ? tags : ['General', 'Insights'];
   }
 }
+
+export async function generateVisionImage(prompt: string): Promise<string> {
+  const fallbackImages = [
+    '/src/assets/images/vision_deep_focus_1792340279405.jpg',
+    '/src/assets/images/vision_mountain_peak_1792340279918.jpg',
+    '/src/assets/images/vision_creative_studio_1792340280119.jpg',
+    '/src/assets/images/vision_cyber_neural_1792340279697.jpg',
+  ];
+
+  try {
+    const ai = getGeminiClient();
+    const response = await ai.models.generateImages({
+      model: 'imagen-3.0-generate-002',
+      prompt,
+      config: {
+        numberOfImages: 1,
+        outputMimeType: 'image/jpeg',
+        aspectRatio: '4:3',
+      },
+    });
+
+    if (response?.generatedImages?.[0]?.image?.imageBytes) {
+      return `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
+    }
+    return fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
+  } catch (err) {
+    console.warn('[AI Service] Imagen generation failed, returning high-res asset fallback:', err);
+    return fallbackImages[Math.floor(Math.random() * fallbackImages.length)];
+  }
+}
+

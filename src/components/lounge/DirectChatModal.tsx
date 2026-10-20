@@ -10,6 +10,8 @@ import {
   Radio,
   Phone,
   Video,
+  Sliders,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useVideoCall } from '../../context/VideoCallContext';
@@ -18,6 +20,7 @@ import {
   subscribeDirectMessages,
   sendDirectMessage,
 } from '../../services/db';
+import { ChatSettingsModal } from './ChatSettingsModal';
 
 interface DirectChatModalProps {
   thread: DirectThreadItem;
@@ -43,6 +46,7 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -171,17 +175,14 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Chat Settings Modal Trigger (Matches 3rd image: Themes, Vanish Mode, Quick Replies) */}
           <button
             type="button"
-            onClick={() => startCall({
-              contactName: recipientName,
-              contactAvatar: recipientAvatar,
-              type: 'video',
-            })}
-            title="Start Video Call"
-            className="flex items-center gap-1 p-2 rounded-xl border border-[var(--color-border)] hover:bg-indigo-500/15 text-indigo-400 hover:text-indigo-300 transition-colors"
+            onClick={() => setIsChatSettingsOpen(true)}
+            title="Chat Settings & Themes"
+            className="flex items-center gap-1 p-2 rounded-xl border border-[var(--color-border)] hover:bg-purple-500/15 text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
           >
-            <Video className="w-4 h-4" />
+            <Settings className="w-4 h-4" />
           </button>
           <button
             type="button"
@@ -361,6 +362,22 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
           </button>
         </form>
       </div>
+
+      {/* Chat Settings Modal */}
+      <ChatSettingsModal
+        isOpen={isChatSettingsOpen}
+        onClose={() => setIsChatSettingsOpen(false)}
+        recipientName={recipientName}
+        recipientAvatar={recipientAvatar}
+        onShowToast={onShowToast}
+        onClearChat={() => {
+          setMessages([]);
+        }}
+        onBlockUser={() => {
+          onShowToast(`Blocked ${recipientName}.`);
+          onClose();
+        }}
+      />
     </div>
   );
 };

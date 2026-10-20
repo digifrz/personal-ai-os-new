@@ -16,8 +16,12 @@ import { SpotifyOSPlayer } from './components/common/SpotifyOSPlayer';
 import { GoogleWorkspaceModal } from './components/common/GoogleWorkspaceModal';
 import { OSAppHubModal } from './components/common/OSAppHubModal';
 import { FloatingAssistantWidget } from './components/common/FloatingAssistantWidget';
+import { VoiceCommandListener } from './components/common/VoiceCommandListener';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
+import { WindowManagerProvider, useWindowManager } from './context/WindowManagerContext';
+import { OSWindowManagerCanvas } from './components/common/OSWindowManagerCanvas';
+import { OSTaskbar } from './components/common/OSTaskbar';
 
 import { DashboardView } from './views/DashboardView';
 import { TasksView } from './views/TasksView';
@@ -35,6 +39,17 @@ import { AIMemoryView } from './views/AIMemoryView';
 import { AnalyticsView } from './views/AnalyticsView';
 import { SettingsView } from './views/SettingsView';
 import { TrashView } from './views/TrashView';
+import { DiaryView } from './views/DiaryView';
+import { HabitsView } from './views/HabitsView';
+import { FinanceView } from './views/FinanceView';
+import { VisionBoardView } from './views/VisionBoardView';
+import { DailyBriefingModal } from './components/common/DailyBriefingModal';
+import { PremiumUpgradeModal } from './components/common/PremiumUpgradeModal';
+import { AIRoastHypeModal } from './components/common/AIRoastHypeModal';
+import { DecisionWheelModal } from './components/common/DecisionWheelModal';
+import { AmbientSoundscapeStation } from './components/common/AmbientSoundscapeStation';
+import { EmergencyFocusMode } from './components/common/EmergencyFocusMode';
+import { NewUserQuickStartCard } from './components/common/NewUserQuickStartCard';
 
 import {
   TaskItem,
@@ -48,6 +63,9 @@ import {
   ActivityLogItem,
   AIMemoryItem,
   NotificationItem,
+  HabitItem,
+  FinanceTransactionItem,
+  VisionBoardItem,
   ViewTab,
 } from './types';
 
@@ -62,13 +80,19 @@ import {
   listenToCommunityPosts,
   listenToActivityLogs,
   listenToNotifications,
+  listenToHabits,
+  listenToTransactions,
+  listenToVisionItems,
+  toggleHabitDate,
   subscribeAIMemories,
   createActivityLog,
   createTask,
+  updateTask,
 } from './services/db';
 
 function WorkspaceApp() {
   const { user, profile, loading: authLoading } = useAuth();
+  const { osMode, openWindow } = useWindowManager();
 
   // Persist active tab across browser page refreshes
   const [activeTab, setActiveTab] = useState<ViewTab>(() => {
@@ -78,6 +102,10 @@ function WorkspaceApp() {
         'dashboard',
         'tasks',
         'notes',
+        'habits',
+        'finance',
+        'vision',
+        'diary',
         'files',
         'calendar',
         'assistant',
@@ -147,14 +175,39 @@ function WorkspaceApp() {
   const [isNoteEditorOpen, setIsNoteEditorOpen] = useState(false);
   const [isEventEditorOpen, setIsEventEditorOpen] = useState(false);
   const [isAITopUpOpen, setIsAITopUpOpen] = useState(false);
+  const [assistantNewChatTrigger, setAssistantNewChatTrigger] = useState(0);
   const [isLoungeRulesOpen, setIsLoungeRulesOpen] = useState(false);
   const [isAppHubOpen, setIsAppHubOpen] = useState(false);
   const [isSpotifyOpen, setIsSpotifyOpen] = useState(false);
   const [isGoogleWorkspaceOpen, setIsGoogleWorkspaceOpen] = useState(false);
-  const { startCall } = useVideoCall();
-  const [hasSeenGuide, setHasSeenGuide] = useState(() => {
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const [isDailyBriefingOpen, setIsDailyBriefingOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isRoastHypeOpen, setIsRoastHypeOpen] = useState(false);
+  const [isDecisionWheelOpen, setIsDecisionWheelOpen] = useState(false);
+  const [isSoundscapeOpen, setIsSoundscapeOpen] = useState(false);
+  const [isEmergencyFocusOpen, setIsEmergencyFocusOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
-      return localStorage.getItem('has_seen_app_guide_v1') === 'true';
+      return localStorage.getItem('personal-ai-os-sidebar-state') === 'collapsed';
+    } catch {
+      return false;
+    }
+  });
+  const { startCall } = useVideoCall();
+  const [visitCount] = useState<number>(() => {
+    try {
+      const prev = parseInt(localStorage.getItem('paio_user_visit_count') || '0', 10);
+      const current = prev + 1;
+      localStorage.setItem('paio_user_visit_count', current.toString());
+      return current;
+    } catch {
+      return 1;
+    }
+  });
+  const [hasDismissedQuickStart, setHasDismissedQuickStart] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('paio_dismissed_quick_start') === 'true';
     } catch {
       return false;
     }
@@ -168,6 +221,9 @@ function WorkspaceApp() {
   const [goals, setGoals] = useState<GoalItem[]>([]);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [flashcards, setFlashcards] = useState<FlashcardItem[]>([]);
+  const [habits, setHabits] = useState<HabitItem[]>([]);
+  const [transactions, setTransactions] = useState<FinanceTransactionItem[]>([]);
+  const [visionItems, setVisionItems] = useState<VisionBoardItem[]>([]);
   const [communityPosts, setCommunityPosts] = useState<CommunityPostItem[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -481,6 +537,169 @@ function WorkspaceApp() {
         timestamp: new Date(Date.now() - 7200000).toISOString(),
       },
     ]);
+
+    const todayDate = new Date().toISOString().split('T')[0];
+    const yestDate = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const twoDaysAgoDate = new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0];
+
+    setHabits([
+      {
+        id: 'h-seed-1',
+        userId: 'sample',
+        title: 'Deep Work & Coding Sprint',
+        category: 'productivity',
+        frequency: 'daily',
+        streakCount: 5,
+        bestStreak: 14,
+        completedDates: [todayDate, yestDate, twoDaysAgoDate],
+        reminderTime: '09:00',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'h-seed-2',
+        userId: 'sample',
+        title: 'Morning 20-min Cardio / Run',
+        category: 'fitness',
+        frequency: 'daily',
+        streakCount: 3,
+        bestStreak: 7,
+        completedDates: [todayDate, yestDate],
+        reminderTime: '07:30',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'h-seed-3',
+        userId: 'sample',
+        title: 'Read 20 pages (Philosophy / Tech)',
+        category: 'learning',
+        frequency: 'daily',
+        streakCount: 8,
+        bestStreak: 21,
+        completedDates: [yestDate, twoDaysAgoDate],
+        reminderTime: '21:00',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'h-seed-4',
+        userId: 'sample',
+        title: 'Mindful Breathing & Posture Reset',
+        category: 'mind',
+        frequency: 'daily',
+        streakCount: 4,
+        bestStreak: 10,
+        completedDates: [todayDate, yestDate],
+        reminderTime: '22:00',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ]);
+
+    setTransactions([
+      {
+        id: 'tx-seed-1',
+        userId: 'sample',
+        type: 'income',
+        amount: 4500,
+        category: 'income',
+        date: todayDate,
+        note: 'Engineering Retainer Inflow',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tx-seed-2',
+        userId: 'sample',
+        type: 'expense',
+        amount: 49.99,
+        category: 'tech',
+        date: todayDate,
+        note: 'Cloud Server Infrastructure',
+        recurring: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tx-seed-3',
+        userId: 'sample',
+        type: 'expense',
+        amount: 84.50,
+        category: 'food',
+        date: yestDate,
+        note: 'Organic Grocery Run',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'tx-seed-4',
+        userId: 'sample',
+        type: 'expense',
+        amount: 15.00,
+        category: 'tech',
+        date: yestDate,
+        note: 'Spotify Premium Family',
+        recurring: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ]);
+
+    setVisionItems([
+      {
+        id: 'vis-seed-1',
+        userId: 'sample',
+        title: 'Executive Focus Sanctuary',
+        caption: 'Design and build world-class, high-impact systems from an ultra-minimalist workstation.',
+        affirmation: 'I bring intense focus and effortless clarity to complex engineering.',
+        category: 'career',
+        targetYear: '2026',
+        isPinned: true,
+        imageUrl: '/src/assets/images/vision_deep_focus_1792340279405.jpg',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'vis-seed-2',
+        userId: 'sample',
+        title: 'Alpine Peak Expedition',
+        caption: 'Reach the summit above the cloudline at sunrise. Continuous physical and mental fortitude.',
+        affirmation: 'No mountain is too steep when I take consistent daily steps.',
+        category: 'travel',
+        targetYear: '2027',
+        isPinned: true,
+        imageUrl: '/src/assets/images/vision_mountain_peak_1792340279918.jpg',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'vis-seed-3',
+        userId: 'sample',
+        title: 'Boutique Creative Design Studio',
+        caption: 'Lead an innovative architecture & software laboratory surrounded by inspiring peers and lush greenery.',
+        affirmation: 'My creativity compounds daily into timeless, elegant products.',
+        category: 'lifestyle',
+        targetYear: '2027',
+        isPinned: false,
+        imageUrl: '/src/assets/images/vision_creative_studio_1792340280119.jpg',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'vis-seed-4',
+        userId: 'sample',
+        title: 'Autonomous Synthetic Intelligence',
+        caption: 'Pioneer advanced multi-modal agent systems that amplify human productivity and creativity.',
+        affirmation: 'I build at the absolute technological frontier.',
+        category: 'career',
+        targetYear: '2028',
+        isPinned: false,
+        imageUrl: '/src/assets/images/vision_cyber_neural_1792340279697.jpg',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ]);
   }, []);
 
   // Listen to Firestore real-time collections or local cache fallback
@@ -495,6 +714,9 @@ function WorkspaceApp() {
       listenToGoals(activeUid, (data) => data.length > 0 && setGoals(data)),
       listenToProjects(activeUid, (data) => data.length > 0 && setProjects(data)),
       listenToFlashcards(activeUid, (data) => data.length > 0 && setFlashcards(data)),
+      listenToHabits(activeUid, (data) => data.length > 0 && setHabits(data)),
+      listenToTransactions(activeUid, (data) => data.length > 0 && setTransactions(data)),
+      listenToVisionItems(activeUid, (data) => data.length > 0 && setVisionItems(data)),
       listenToCommunityPosts((data) => data.length > 0 && setCommunityPosts(data)),
       listenToActivityLogs(activeUid, (data) => data.length > 0 && setActivityLogs(data)),
       listenToNotifications(activeUid, (data) => data.length > 0 && setNotifications(data)),
@@ -547,6 +769,33 @@ function WorkspaceApp() {
     setActiveTab('tasks');
   };
 
+  const handleToggleTaskStatus = async (taskId: string) => {
+    const t = tasks.find((item) => item.id === taskId);
+    if (!t) return;
+    const nextStatus: 'done' | 'open' = t.status === 'done' ? 'open' : 'done';
+    setTasks((prev) =>
+      prev.map((item) => (item.id === taskId ? { ...item, status: nextStatus } : item))
+    );
+    if (user) {
+      try {
+        await updateTask(taskId, { status: nextStatus });
+      } catch (err) {
+        console.warn('Update task error:', err);
+      }
+    }
+  };
+
+  const handleToggleHabit = async (habitId: string, dateStr: string, completedDates: string[]) => {
+    try {
+      const nextDates = await toggleHabitDate(habitId, dateStr, completedDates);
+      setHabits((prev) =>
+        prev.map((h) => (h.id === habitId ? { ...h, completedDates: nextDates } : h))
+      );
+    } catch (e) {
+      console.warn('Toggle habit error:', e);
+    }
+  };
+
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -561,6 +810,11 @@ function WorkspaceApp() {
             onOpenNewTask={() => setIsTaskEditorOpen(true)}
             onOpenNewNote={() => setIsNoteEditorOpen(true)}
             onOpenNewEvent={() => setIsEventEditorOpen(true)}
+            onOpenDailyBriefing={() => setIsDailyBriefingOpen(true)}
+            onOpenRoastHype={() => setIsRoastHypeOpen(true)}
+            onOpenDecisionWheel={() => setIsDecisionWheelOpen(true)}
+            onOpenSoundscape={() => setIsSoundscapeOpen(true)}
+            onOpenEmergencyFocus={() => setIsEmergencyFocusOpen(true)}
           />
         );
       case 'tasks':
@@ -590,6 +844,90 @@ function WorkspaceApp() {
             files={files}
             onLogActivity={logWorkspaceActivity}
           />
+        );
+      case 'diary':
+        return (
+          <DiaryView
+            calendarEvents={events}
+            onNavigate={(tab) => setActiveTab(tab as any)}
+          />
+        );
+      case 'habits':
+        return (
+          <HabitsView
+            habits={habits}
+            onOpenAIAdvice={() => setActiveTab('assistant')}
+          />
+        );
+      case 'finance':
+        return (
+          <FinanceView
+            transactions={transactions}
+          />
+        );
+      case 'vision':
+        return (
+          <VisionBoardView
+            items={visionItems}
+            onOpenUpgrade={() => setIsUpgradeModalOpen(true)}
+          />
+        );
+      case 'integrations':
+        return (
+          <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8 space-y-6 animate-fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-sm">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-black text-[var(--color-text)]">
+                    Integrations &amp; Floating Apps Launchpad
+                  </span>
+                  <span className="rounded-full bg-indigo-500/15 border border-indigo-500/30 px-2.5 py-0.5 text-[10px] font-bold text-indigo-400">
+                    All-in-One OS
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--color-muted)] mt-1">
+                  Launch, float, and dock your real external applications anywhere across your workspace.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAppHubOpen(true)}
+                className="rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold px-4 py-2 text-xs shadow-md transition-all"
+              >
+                Open Hub Modal
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[
+                { name: 'Spotify OS Music', desc: 'Floating ambient beats & full song list playlist player', badge: 'Audio Flow', action: () => setIsSpotifyOpen(true), color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400' },
+                { name: 'Google Workspace', desc: 'Direct Gmail sender & Google Calendar bi-directional sync', badge: 'Productivity', action: () => setIsGoogleWorkspaceOpen(true), color: 'border-red-500/30 bg-red-500/5 text-red-400' },
+                { name: 'Dual AI Assistant', desc: 'Gemini 3.8 Flash & ChatGPT multi-thread conversational reasoning', badge: 'Intelligence', action: () => setActiveTab('assistant'), color: 'border-violet-500/30 bg-violet-500/5 text-violet-400' },
+                { name: 'Daily Reflection Diary', desc: 'Personal diary with calendar reflection & Google Docs sync', badge: 'Journaling', action: () => setActiveTab('diary'), color: 'border-purple-500/30 bg-purple-500/5 text-purple-400' },
+                { name: 'Google Classroom & Meet', desc: 'Course assignments sync and online study meeting rooms', badge: 'Education', action: () => setActiveTab('learning'), color: 'border-amber-500/30 bg-amber-500/5 text-amber-400' },
+                { name: 'Google Drive Cloud Mode', desc: 'Browse Drive files and upload/share directly to Lounge', badge: 'Cloud Storage', action: () => setActiveTab('files'), color: 'border-blue-500/30 bg-blue-500/5 text-blue-400' },
+              ].map((item, i) => (
+                <div key={i} className={`p-5 rounded-3xl border ${item.color} space-y-3 flex flex-col justify-between shadow-sm hover:border-opacity-60 transition-all`}>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-extrabold text-sm text-[var(--color-text)]">{item.name}</h4>
+                      <span className="text-[10px] font-bold opacity-80 rounded-full px-2 py-0.5 bg-white/5 border border-white/10">
+                        {item.badge}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--color-muted)] mt-1.5 leading-relaxed">{item.desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={item.action}
+                    className="w-full rounded-xl bg-white/10 hover:bg-white/20 py-2 text-xs font-bold text-[var(--color-text)] transition-colors text-center"
+                  >
+                    Open / Float Anywhere
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         );
       case 'files':
         return <FilesView files={files} />;
@@ -621,6 +959,7 @@ function WorkspaceApp() {
             events={events}
             memories={memories}
             aiMemoryEnabled={aiMemoryEnabled}
+            openNewChatTrigger={assistantNewChatTrigger}
             onNavigate={(tab) => setActiveTab(tab as ViewTab)}
             onLogActivity={logWorkspaceActivity}
           />
@@ -693,6 +1032,11 @@ function WorkspaceApp() {
             onOpenNewTask={() => setIsTaskEditorOpen(true)}
             onOpenNewNote={() => setIsNoteEditorOpen(true)}
             onOpenNewEvent={() => setIsEventEditorOpen(true)}
+            onOpenDailyBriefing={() => setIsDailyBriefingOpen(true)}
+            onOpenRoastHype={() => setIsRoastHypeOpen(true)}
+            onOpenDecisionWheel={() => setIsDecisionWheelOpen(true)}
+            onOpenSoundscape={() => setIsSoundscapeOpen(true)}
+            onOpenEmergencyFocus={() => setIsEmergencyFocusOpen(true)}
           />
         );
     }
@@ -728,10 +1072,21 @@ function WorkspaceApp() {
         onOpenAbout={() => setIsAboutModalOpen(true)}
         onForceRefresh={handleForceRefresh}
         isSyncing={isSyncing}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => {
+          const next = !isSidebarCollapsed;
+          setIsSidebarCollapsed(next);
+          localStorage.setItem('personal-ai-os-sidebar-state', next ? 'collapsed' : 'expanded');
+        }}
+        onOpenIntegrations={() => setIsAppHubOpen(true)}
       />
 
-      {/* Main Content Area - shifts on desktop to accommodate sidebar */}
-      <div className="flex flex-1 flex-col transition-all duration-200 lg:pl-[256px]">
+      {/* Main Content Area - dynamically responsive when sidebar closes or collapses */}
+      <div
+        className={`flex flex-1 flex-col transition-all duration-300 w-full min-w-0 ${
+          isSidebarCollapsed ? 'lg:pl-[72px]' : 'lg:pl-[256px]'
+        }`}
+      >
         {/* Top Header */}
         <Topbar
           activeTab={activeTab}
@@ -742,12 +1097,23 @@ function WorkspaceApp() {
           onOpenNewEvent={() => setIsEventEditorOpen(true)}
           onOpenAuth={() => setIsAuthModalOpen(true)}
           onOpenAbout={() => setIsAboutModalOpen(true)}
-          onOpenAITopUp={() => setIsAITopUpOpen(true)}
+          onOpenAITopUp={() => {
+            setAssistantNewChatTrigger((prev) => prev + 1);
+            setActiveTab('assistant');
+          }}
+          onOpenDailyBriefing={() => setIsDailyBriefingOpen(true)}
+          onOpenUpgrade={() => setIsUpgradeModalOpen(true)}
+          onOpenRoastHype={() => setIsRoastHypeOpen(true)}
+          onOpenDecisionWheel={() => setIsDecisionWheelOpen(true)}
+          onOpenSoundscape={() => setIsSoundscapeOpen(true)}
+          onOpenEmergencyFocus={() => setIsEmergencyFocusOpen(true)}
           onOpenLoungeRules={() => setIsLoungeRulesOpen(true)}
           onOpenAppHub={() => setIsAppHubOpen(true)}
           onOpenSpotify={() => setIsSpotifyOpen(true)}
           onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
           onOpenVideoCall={() => startCall({ contactName: 'Live Video Meet', contactAvatar: '', type: 'video' })}
+          onToggleVoiceListener={() => setIsVoiceListening((prev) => !prev)}
+          isVoiceListening={isVoiceListening}
           notifications={notifications}
         />
 
@@ -757,49 +1123,19 @@ function WorkspaceApp() {
           setActiveTab={setActiveTab}
         />
 
-        {/* First-time visitor welcome banner */}
-        {!hasSeenGuide && (
-          <div
-            id="new-user-welcome-banner"
-            className="mx-4 mt-3 sm:mx-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/50 via-violet-950/40 to-indigo-900/30 p-3 px-4 shadow-lg animate-in fade-in slide-in-from-top-2 duration-300"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs sm:text-sm font-bold text-[var(--color-text)]">
-                  Welcome to Personal AI OS!
-                </p>
-                <p className="text-[11px] sm:text-xs text-[var(--color-muted)]">
-                  Discover what this app does, explore key features, and review our zero-tracking privacy policies.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                id="explore-guide-banner-btn"
-                onClick={() => setIsAboutModalOpen(true)}
-                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] hover:bg-white/5 px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] shadow-sm transition-all"
-              >
-                Guide & Policies
-              </button>
-              <button
-                type="button"
-                id="dismiss-guide-banner-btn"
-                onClick={() => {
-                  setHasSeenGuide(true);
-                  try {
-                    localStorage.setItem('has_seen_app_guide_v1', 'true');
-                  } catch {}
-                }}
-                className="rounded-xl px-2.5 py-1.5 text-xs font-medium text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-white/5 transition-colors"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
+        {/* First & Second-time user interactive quick-start onboarding */}
+        {visitCount <= 2 && !hasDismissedQuickStart && (
+          <NewUserQuickStartCard
+            visitNumber={visitCount}
+            onNavigate={(tab) => setActiveTab(tab as any)}
+            onOpenSpotify={() => setIsSpotifyOpen(true)}
+            onDismiss={() => {
+              setHasDismissedQuickStart(true);
+              try {
+                localStorage.setItem('paio_dismissed_quick_start', 'true');
+              } catch {}
+            }}
+          />
         )}
 
         {/* Dynamic Page View with Resilience Boundary */}
@@ -823,6 +1159,11 @@ function WorkspaceApp() {
         onOpenSpotify={() => setIsSpotifyOpen(true)}
         onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
         onOpenVideoCall={() => startCall({ contactName: 'Live Video Meet', contactAvatar: '', type: 'video' })}
+        onToggleVoiceListener={() => setIsVoiceListening((prev) => !prev)}
+        onOpenRoastHype={() => setIsRoastHypeOpen(true)}
+        onOpenDecisionWheel={() => setIsDecisionWheelOpen(true)}
+        onOpenSoundscape={() => setIsSoundscapeOpen(true)}
+        onOpenEmergencyFocus={() => setIsEmergencyFocusOpen(true)}
       />
 
       {/* Authentication Modal */}
@@ -868,11 +1209,30 @@ function WorkspaceApp() {
       {/* WebRTC Video Call Interface (Full Modal & Draggable Floating Picture-in-Picture) */}
       <VideoCallInterface />
 
+      {/* Global Voice Command Listener using Web Speech API */}
+      <VoiceCommandListener
+        isListening={isVoiceListening}
+        onToggleListening={setIsVoiceListening}
+        onNavigate={(tab) => setActiveTab(tab)}
+        onOpenNewTask={(_prefillTitle) => {
+          setIsTaskEditorOpen(true);
+        }}
+        onOpenNewNote={() => setIsNoteEditorOpen(true)}
+        onOpenNewEvent={() => setIsEventEditorOpen(true)}
+        onOpenSpotify={() => setIsSpotifyOpen(true)}
+        onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
+        onOpenVideoCall={() => startCall({ contactName: 'Voice Live Meet', contactAvatar: '', type: 'video' })}
+        onOpenAppHub={() => setIsAppHubOpen(true)}
+      />
+
       {/* Universal OS App Hub (Home for all apps: ChatGPT, Spotify, Google Workspace, Video Call, Canva, GitHub) */}
       <OSAppHubModal
         isOpen={isAppHubOpen}
         onClose={() => setIsAppHubOpen(false)}
-        onOpenChatGPT={() => setActiveTab('assistant')}
+        onOpenChatGPT={() => {
+          setAssistantNewChatTrigger((prev) => prev + 1);
+          setActiveTab('assistant');
+        }}
         onOpenSpotify={() => setIsSpotifyOpen(true)}
         onOpenGoogleWorkspace={() => setIsGoogleWorkspaceOpen(true)}
         onOpenVideoCall={() => startCall({ contactName: 'Live Video Meet', contactAvatar: '', type: 'video' })}
@@ -899,6 +1259,143 @@ function WorkspaceApp() {
         notes={notes}
         onNavigateTab={(tab) => setActiveTab(tab as any)}
       />
+
+      {/* Floating Multi-Window Desktop Canvas */}
+      <OSWindowManagerCanvas
+        tasks={tasks}
+        notes={notes}
+        habits={habits}
+        transactions={transactions}
+        onToggleTaskStatus={handleToggleTaskStatus}
+        onToggleHabit={handleToggleHabit}
+        onNavigateTab={(tab) => setActiveTab(tab as any)}
+      />
+
+      {/* Persistent Bottom OS Taskbar & Running Windows Dock */}
+      <OSTaskbar
+        onOpenAppHub={() => setIsAppHubOpen(true)}
+        onOpenSpotify={() => setIsSpotifyOpen(true)}
+        onOpenAssistant={() => {
+          openWindow({
+            id: 'os_assistant',
+            title: '✦ Floating OS AI Assistant',
+            icon: '✦',
+            component: 'assistant',
+            defaultSize: { width: 440, height: 520 },
+          });
+        }}
+        onOpenVoiceRoom={() => {
+          openWindow({
+            id: 'voice_stage',
+            title: '🎙️ Lounge Voice Room: Live Audio Stage',
+            icon: '🎙️',
+            component: 'voice_room',
+            defaultSize: { width: 560, height: 500 },
+          });
+        }}
+        onOpenDirectChat={() => {
+          setActiveTab('community');
+        }}
+        onOpenScratchpad={() => {
+          openWindow({
+            id: 'os_scratchpad',
+            title: '📝 Quick OS Scratchpad',
+            icon: '📝',
+            component: 'scratchpad',
+            defaultSize: { width: 420, height: 380 },
+          });
+        }}
+        onOpenFiles={() => {
+          openWindow({
+            id: 'os_files',
+            title: '📁 Cloud Vault & Quick Upload',
+            icon: '📁',
+            component: 'files',
+            defaultSize: { width: 480, height: 420 },
+          });
+        }}
+        onOpenTasks={() => {
+          openWindow({
+            id: 'os_tasks',
+            title: '✅ Quick Tasks & Checklist',
+            icon: '✅',
+            component: 'tasks',
+            defaultSize: { width: 440, height: 460 },
+          });
+        }}
+        onOpenHabits={() => {
+          openWindow({
+            id: 'os_habits',
+            title: '🔥 Today\'s Habits & Streaks',
+            icon: '🔥',
+            component: 'habits',
+            defaultSize: { width: 440, height: 480 },
+          });
+        }}
+        onOpenFinance={() => {
+          openWindow({
+            id: 'os_finance',
+            title: '💵 Personal Finance & Cash Flow',
+            icon: '💵',
+            component: 'finance',
+            defaultSize: { width: 460, height: 480 },
+          });
+        }}
+        onOpenDailyBriefing={() => setIsDailyBriefingOpen(true)}
+        onOpenRoastHype={() => setIsRoastHypeOpen(true)}
+        onOpenDecisionWheel={() => setIsDecisionWheelOpen(true)}
+        onOpenSoundscape={() => setIsSoundscapeOpen(true)}
+      />
+
+      {/* Autonomous Morning & Evening AI Executive Briefing */}
+      <DailyBriefingModal
+        isOpen={isDailyBriefingOpen}
+        onClose={() => setIsDailyBriefingOpen(false)}
+        tasks={tasks}
+        events={events}
+        habits={habits}
+        transactions={transactions}
+        onNavigateTab={(tab) => setActiveTab(tab as any)}
+      />
+
+      {/* Premium & Pro Tier Upgrade Modal */}
+      <PremiumUpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        onShowToast={(msg) => logWorkspaceActivity('upgraded', 'membership', msg)}
+      />
+
+      {/* Next-Gen Humorous AI Motivation & Procrastination Roast Coach */}
+      <AIRoastHypeModal
+        isOpen={isRoastHypeOpen}
+        onClose={() => setIsRoastHypeOpen(false)}
+        tasks={tasks}
+        habits={habits}
+        transactions={transactions}
+        onNavigateTab={(tab) => setActiveTab(tab as any)}
+      />
+
+      {/* Next-Gen Decision Wheel of Destiny & Quantum Coin Flip */}
+      <DecisionWheelModal
+        isOpen={isDecisionWheelOpen}
+        onClose={() => setIsDecisionWheelOpen(false)}
+        tasks={tasks}
+        onNavigateTab={(tab) => setActiveTab(tab as any)}
+      />
+
+      {/* Next-Gen Spatial Audio Focus Station */}
+      <AmbientSoundscapeStation
+        isOpen={isSoundscapeOpen}
+        onClose={() => setIsSoundscapeOpen(false)}
+      />
+
+      {/* Next-Gen Emergency Single-Task Lockdown Protocol */}
+      <EmergencyFocusMode
+        isOpen={isEmergencyFocusOpen}
+        onClose={() => setIsEmergencyFocusOpen(false)}
+        tasks={tasks}
+        onCompleteTask={handleToggleTaskStatus}
+      />
     </motion.div>
   );
 }
@@ -907,15 +1404,17 @@ export default function App() {
   return (
     <AuthProvider>
       <VideoCallProvider>
-        <motion.div
-          id="main-app-container"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, ease: 'easeOut' }}
-          className="min-h-screen w-full"
-        >
-          <WorkspaceApp />
-        </motion.div>
+        <WindowManagerProvider>
+          <motion.div
+            id="main-app-container"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+            className="min-h-screen w-full"
+          >
+            <WorkspaceApp />
+          </motion.div>
+        </WindowManagerProvider>
       </VideoCallProvider>
     </AuthProvider>
   );

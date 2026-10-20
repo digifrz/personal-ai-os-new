@@ -22,6 +22,19 @@ import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, googleProvider, db, validateFirestoreConnection } from '../firebase';
 import { UserProfile } from '../types';
 
+export type PremiumTier = 'free' | 'pro' | 'executive';
+
+export interface PremiumStatus {
+  tier: PremiumTier;
+  isPro: boolean;
+  isExecutive: boolean;
+  cloudStorageLimitMB: number;
+  aiModelTier: 'gemini-flash' | 'imagen-pro' | 'multi-model-ensemble';
+  canGenerateVisionArt: boolean;
+  canUseVoiceBriefings: boolean;
+  hasUnlimitedLoungeStage: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
@@ -29,6 +42,8 @@ interface AuthContextType {
   accountType: 'personal' | 'business';
   setAccountType: (type: 'personal' | 'business') => Promise<void>;
   toggleAccountType: () => Promise<void>;
+  premiumStatus: PremiumStatus;
+  setPremiumTier: (tier: PremiumTier) => Promise<void>;
   signInWithGoogle: () => Promise<boolean>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, name: string) => Promise<void>;
@@ -53,6 +68,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
     return 'personal';
   });
+
+  // Subscription / Membership tier state
+  const [localPremiumTier, setLocalPremiumTier] = useState<PremiumTier>(() => {
+    try {
+      const saved = localStorage.getItem('personal_ai_os_tier') as PremiumTier;
+      if (saved === 'free' || saved === 'pro' || saved === 'executive') return saved;
+    } catch {}
+    return 'pro';
+  });
+
+  const effectiveTier: PremiumTier = (profile?.membershipTier as PremiumTier) || localPremiumTier;
+
+  const premiumStatus: PremiumStatus = {
+    tier: effectiveTier,
+    isPro: effectiveTier === 'pro' || effectiveTier === 'executive',
+    isExecutive: effectiveTier === 'executive',
+    cloudStorageLimitMB: effectiveTier === 'executive' ? 50000 : effectiveTier === 'pro' ? 10000 : 500,
+    aiModelTier: effectiveTier === 'executive' ? 'multi-model-ensemble' : effectiveTier === 'pro' ? 'imagen-pro' : 'gemini-flash',
+    canGenerateVisionArt: true,
+    canUseVoiceBriefings: effectiveTier === 'pro' || effectiveTier === 'executive',
+    hasUnlimitedLoungeStage: effectiveTier === 'pro' || effectiveTier === 'executive',
+  };
 
   // Effective accountType prioritizes profile from cloud, falling back to local
   const currentAccountType: 'personal' | 'business' = profile?.accountType || localAccountType;
@@ -258,6 +295,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await setAccountType(nextType);
   };
 
+  const setPremiumTier = async (tier: PremiumTier) => {
+    setLocalPremiumTier(tier);
+    try {
+      localStorage.setItem('personal_ai_os_tier', tier);
+    } catch {}
+    if (user) {
+      await updateUserProfile({ membershipTier: tier }).catch((err) => {
+        console.warn('Could not sync membershipTier to Firestore profile:', err);
+      });
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -267,6 +316,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         accountType: currentAccountType,
         setAccountType,
         toggleAccountType,
+        premiumStatus,
+        setPremiumTier,
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,

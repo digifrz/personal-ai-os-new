@@ -25,7 +25,24 @@ import {
   ListChecks,
   ArrowRight,
 } from 'lucide-react';
-import { Reorder, useDragControls, motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '../context/AuthContext';
 import { TaskItem } from '../types';
 import { createTask, updateTask, deleteTask, batchUpdateTaskOrders } from '../services/db';
@@ -104,28 +121,40 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
   onDuplicateTask,
   onDeleteTask,
 }) => {
-  const dragControls = useDragControls();
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.75 : 1,
+  };
 
   return (
-    <Reorder.Item
-      value={task}
+    <div
+      ref={setNodeRef}
+      style={style}
       id={`task-item-${task.id}`}
-      dragListener={false}
-      dragControls={dragControls}
-      whileDrag={{
-        scale: 1.015,
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.25)',
-        borderColor: 'var(--color-primary)',
-        zIndex: 60,
-      }}
-      className="group relative flex items-start gap-3.5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm hover:border-[var(--color-primary)]/70 transition-colors select-none"
+      className={`group relative flex items-start gap-3.5 rounded-2xl border bg-[var(--color-surface)] p-4 shadow-sm transition-all select-none ${
+        isDragging
+          ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]/40 shadow-2xl scale-[1.01]'
+          : 'border-[var(--color-border)] hover:border-[var(--color-primary)]/70'
+      }`}
     >
-      {/* Dedicated Drag & Drop Handle */}
+      {/* Dedicated dnd-kit Drag Handle */}
       <button
         type="button"
-        onPointerDown={(e) => dragControls.start(e)}
+        {...attributes}
+        {...listeners}
         className="mt-0.5 flex h-7 w-6 shrink-0 items-center justify-center rounded-lg text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-border)]/40 cursor-grab active:cursor-grabbing touch-none transition-colors"
-        title="Drag handle to reprioritize task"
+        title="Drag handle to reprioritize task with dnd-kit"
         aria-label={`Drag handle to reprioritize task ${task.title}`}
       >
         <GripVertical className="w-4 h-4 opacity-40 group-hover:opacity-100 transition-opacity text-[var(--color-text)]" />
@@ -224,7 +253,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
-    </Reorder.Item>
+    </div>
   );
 };
 
@@ -471,6 +500,30 @@ export const TasksView: React.FC<TasksViewProps> = ({
     } catch (err) {
       console.warn('Could not persist task orders to Firestore:', err);
     }
+  };
+
+  // dnd-kit sensors configuration with distance constraint and keyboard support
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDndDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = displayTasks.findIndex((t) => t.id === active.id);
+    const newIndex = displayTasks.findIndex((t) => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(displayTasks, oldIndex, newIndex);
+    handleReorderTasks(reordered);
   };
 
   // Kanban drag-and-drop card status mover
@@ -902,26 +955,32 @@ Respond ONLY with valid JSON:
                 )}
               </div>
 
-              {/* Framer Motion Reorder Group for smooth vertical drag-and-drop */}
-              <Reorder.Group
-                axis="y"
-                values={displayTasks}
-                onReorder={handleReorderTasks}
-                className="space-y-3"
+              {/* dnd-kit Sortable Context for smooth vertical drag-and-drop prioritization */}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDndDragEnd}
               >
-                {displayTasks.map((task, index) => (
-                  <TaskListItem
-                    key={task.id}
-                    task={task}
-                    index={index}
-                    isManualSort={sortBy === 'manual'}
-                    onToggleStatus={handleToggleStatus}
-                    onOpenEdit={handleOpenEdit}
-                    onDuplicateTask={handleDuplicateTask}
-                    onDeleteTask={handleDeleteTask}
-                  />
-                ))}
-              </Reorder.Group>
+                <SortableContext
+                  items={displayTasks.map((t) => t.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {displayTasks.map((task, index) => (
+                      <TaskListItem
+                        key={task.id}
+                        task={task}
+                        index={index}
+                        isManualSort={sortBy === 'manual'}
+                        onToggleStatus={handleToggleStatus}
+                        onOpenEdit={handleOpenEdit}
+                        onDuplicateTask={handleDuplicateTask}
+                        onDeleteTask={handleDeleteTask}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
 
               {displayTasks.length === 0 && (
                 <div className="py-8">

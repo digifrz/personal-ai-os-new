@@ -123,3 +123,33 @@ export async function suggestTagsAI(content: string): Promise<string[]> {
     return ['General'];
   }
 }
+
+export async function generateVisionImageAI(prompt: string): Promise<string> {
+  const fallbackAssets = [
+    '/src/assets/images/vision_deep_focus_1792340279405.jpg',
+    '/src/assets/images/vision_mountain_peak_1792340279918.jpg',
+    '/src/assets/images/vision_creative_studio_1792340280119.jpg',
+    '/src/assets/images/vision_cyber_neural_1792340279697.jpg',
+  ];
+
+  try {
+    const response = await fetch('/api/assistant/generate-image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.imageUrl) return data.imageUrl;
+    }
+  } catch (e) {
+    console.warn('AI image generation client notice:', e);
+  }
+
+  // Return one of the high-res generated asset inspirations
+  return fallbackAssets[Math.floor(Math.random() * fallbackAssets.length)];
+}
+

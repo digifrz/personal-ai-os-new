@@ -34,6 +34,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useWindowManager } from '../context/WindowManagerContext';
 import {
   CommunityPostItem,
   CommunityCommentItem,
@@ -78,6 +79,8 @@ import { LoungeNotificationsTab } from '../components/lounge/LoungeNotifications
 import { LoungeAskAICardModal } from '../components/lounge/LoungeAskAICardModal';
 import { PulsesViewer } from '../components/lounge/PulsesViewer';
 import { CreatorStudioDashboard } from '../components/lounge/CreatorStudioDashboard';
+import { LoungeAccountsCenterModal } from '../components/lounge/LoungeAccountsCenterModal';
+import { RealPaymentCheckoutModal } from '../components/common/RealPaymentCheckoutModal';
 import {
   rankBySmartAlgorithm,
   recordAlgorithmInteraction,
@@ -139,6 +142,7 @@ const SEED_PROFILES: UserProfile[] = [
 export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPosts, onNavigate }) => {
   const { user, profile, accountType, setAccountType } = useAuth();
   const { startCall } = useVideoCall();
+  const { openWindow } = useWindowManager();
 
   // Navigation Tabs: The Lounge (Feed, Explore, Create, Inbox, Notifications, Profile, Rooms, People)
   const [activeTab, setActiveTab] = useState<
@@ -245,6 +249,8 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   // Modals
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
+  const [showAccountsCenter, setShowAccountsCenter] = useState(false);
+  const [showPaymentsModal, setShowPaymentsModal] = useState(false);
   const [profileModalUser, setProfileModalUser] = useState<{
     userId: string;
     displayName: string;
@@ -798,29 +804,34 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
         </div>
       )}
 
-      {/* Primary Community Header */}
+      {/* Primary Lounge Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-border)]/70 pb-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--color-text)]">
-            Community
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--color-text)]">
+              The Lounge
+            </h1>
+            <span className="rounded-full bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 px-2.5 py-0.5 text-[10px] font-black text-purple-300">
+              {accountType === 'business' ? '💼 Professional Suite' : '👤 Personal Network'}
+            </span>
+          </div>
           <p className="mt-0.5 text-xs text-[var(--color-muted)]">
-            Connect, share updates, watch Pulses, and explore stories.
+            Connect, share updates, watch Pulses, explore creators, and collaborate in Personal AI OS.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => startCall({
-            contactName: 'Lounge Live Room',
-            contactAvatar: '',
-            type: 'video',
-          })}
-          className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg hover:from-indigo-500 hover:to-purple-500 transition-all self-start sm:self-auto hover:scale-105 active:scale-95"
-        >
-          <VideoIcon className="w-4 h-4" />
-          <span>Start Instant Video Call</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            id="lounge-accounts-center-btn"
+            onClick={() => setShowAccountsCenter(true)}
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 px-4 py-2.5 text-xs font-black text-white shadow-lg hover:from-purple-500 hover:to-pink-500 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+            title="Open Lounge Accounts Center (Personal & Business profiles, privacy & payments)"
+          >
+            <Shield className="w-4 h-4" />
+            <span>Accounts Center</span>
+          </button>
+        </div>
       </header>
 
       {/* Hidden File Input for Story Upload */}
@@ -892,6 +903,24 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
           >
             <Users className="w-3.5 h-3.5" />
             <span>People</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              openWindow({
+                id: 'voice_stage',
+                title: '🎙️ Lounge Voice Room: Live Audio Stage',
+                icon: '🎙️',
+                component: 'voice_room',
+                defaultSize: { width: 560, height: 500 },
+              });
+            }}
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 border border-violet-500/40 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 hover:border-violet-500/60 transition-all shadow-sm group"
+            title="Launch floating live audio voice room stage with speakers & listeners"
+          >
+            <Radio className="w-3.5 h-3.5 text-violet-400 group-hover:scale-110 transition-transform animate-pulse" />
+            <span>Voice Stage</span>
           </button>
         </div>
       </nav>
@@ -2022,6 +2051,24 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
       <LoungeAskAICardModal
         isOpen={isAskAICardOpen}
         onClose={() => setIsAskAICardOpen(false)}
+      />
+
+      {/* Lounge Accounts Center Modal (Personal vs Business Profile, Privacy & Payments) */}
+      <LoungeAccountsCenterModal
+        isOpen={showAccountsCenter}
+        onClose={() => setShowAccountsCenter(false)}
+        onShowToast={showToast}
+        onOpenPayments={() => setShowPaymentsModal(true)}
+      />
+
+      {/* Real Payment Systems Checkout Modal */}
+      <RealPaymentCheckoutModal
+        isOpen={showPaymentsModal}
+        onClose={() => setShowPaymentsModal(false)}
+        planTitle="Lounge Business Creator Suite"
+        amount={15}
+        currency="USD"
+        onShowToast={showToast}
       />
     </div>
   );

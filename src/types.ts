@@ -28,6 +28,7 @@ export interface UserProfile {
   businessPhone?: string;
   businessWebsite?: string;
   accountVerified?: boolean;
+  membershipTier?: 'free' | 'pro' | 'executive';
   updatedAt?: string;
 }
 
@@ -95,8 +96,21 @@ export interface CalendarEventItem {
   location?: string;
   reminderMinutes?: number | null;
   recurrenceRule?: string | null;
+  googleCalendarEventId?: string | null;
+  syncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SpotifyPlaylistSummary {
+  id: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  tracksCount?: number;
+  ownerName?: string;
+  externalUrl?: string;
+  isPersonal?: boolean;
 }
 
 export interface GoalItem {
@@ -318,9 +332,32 @@ export interface StoryItem {
 export interface AIChatMessage {
   id: string;
   userId?: string;
+  sessionId?: string;
   role: 'user' | 'model';
+  provider?: 'gemini' | 'chatgpt' | 'openai' | 'hybrid';
   text: string;
   createdAt: string;
+}
+
+export interface DiaryEntry {
+  id: string;
+  userId: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  content: string;
+  mood?: 'happy' | 'productive' | 'calm' | 'reflective' | 'stressed' | 'neutral';
+  tags: string[];
+  attachments?: Array<{
+    name: string;
+    url: string;
+    type: string;
+    size?: number;
+  }>;
+  syncedToGoogleDocs?: boolean;
+  googleDocUrl?: string;
+  calendarLinked?: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ActivityLogItem {
@@ -336,11 +373,60 @@ export interface ActivityLogItem {
   status?: 'success' | 'warning' | 'info';
 }
 
+export interface HabitItem {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  category: 'health' | 'mind' | 'productivity' | 'fitness' | 'learning';
+  frequency: 'daily' | 'weekly';
+  streakCount: number;
+  bestStreak: number;
+  completedDates: string[]; // YYYY-MM-DD
+  targetPerWeek?: number;
+  reminderTime?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinanceTransactionItem {
+  id: string;
+  userId: string;
+  type: 'income' | 'expense';
+  amount: number;
+  category: 'housing' | 'food' | 'transport' | 'tech' | 'entertainment' | 'health' | 'savings' | 'income' | 'other';
+  date: string; // YYYY-MM-DD
+  note: string;
+  recurring?: boolean;
+  paymentMethod?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VisionBoardItem {
+  id: string;
+  userId: string;
+  title: string;
+  caption?: string;
+  category: 'career' | 'travel' | 'wellness' | 'wealth' | 'learning' | 'lifestyle';
+  imageUrl: string;
+  targetYear?: string;
+  isPinned?: boolean;
+  affirmation?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type ViewTab =
   | 'dashboard'
   | 'search'
   | 'tasks'
   | 'notes'
+  | 'habits'
+  | 'finance'
+  | 'vision'
+  | 'diary'
   | 'files'
   | 'calendar'
   | 'assistant'
@@ -353,7 +439,9 @@ export type ViewTab =
   | 'community'
   | 'chats'
   | 'notifications'
+  | 'integrations'
   | 'settings'
   | 'favorites'
   | 'recent'
   | 'trash';
+

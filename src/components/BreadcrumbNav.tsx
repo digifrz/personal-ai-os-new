@@ -24,6 +24,9 @@ import {
   MessageSquare,
   Star,
   Clock,
+  Book,
+  Flame,
+  DollarSign,
 } from 'lucide-react';
 import { ViewTab } from '../types';
 
@@ -69,6 +72,46 @@ const TAB_METADATA: Record<ViewTab, BreadcrumbItemInfo> = {
     icon: FileText,
     color: '#F59E0B',
     description: 'Markdown docs & scratchpad',
+  },
+  diary: {
+    id: 'diary',
+    label: 'Diary & Journal',
+    section: 'Productivity',
+    icon: Book,
+    color: '#A855F7',
+    description: 'Daily reflection, mood & calendar sync',
+  },
+  habits: {
+    id: 'habits',
+    label: 'Habits & Streaks',
+    section: 'Productivity',
+    icon: Flame,
+    color: '#F97316',
+    description: 'Daily consistency & streak heatmaps',
+  },
+  finance: {
+    id: 'finance',
+    label: 'Finance & Budget',
+    section: 'Planning',
+    icon: DollarSign,
+    color: '#10B981',
+    description: 'Income, expenses, subscriptions & cash flow',
+  },
+  vision: {
+    id: 'vision',
+    label: 'Vision Board & Aspirations',
+    section: 'Planning',
+    icon: Sparkles,
+    color: '#EC4899',
+    description: 'Motivational visual pins, mental anchors & Imagen 3 inspiration',
+  },
+  integrations: {
+    id: 'integrations',
+    label: 'Integrations',
+    section: 'System',
+    icon: Layers,
+    color: '#6366F1',
+    description: 'External apps, floating tools & services',
   },
   files: {
     id: 'files',

@@ -3,6 +3,7 @@ import {
   processAssistantRequest,
   polishPostContent,
   extractContentTags,
+  generateVisionImage,
 } from '../services/ai.service';
 import { createRateLimiter } from '../middleware/rateLimiter';
 
@@ -54,3 +55,18 @@ assistantRouter.post('/tags', async (req: Request, res: Response, next) => {
     next(error);
   }
 });
+
+assistantRouter.post('/generate-image', async (req: Request, res: Response, next) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== 'string') {
+      return res.status(400).json({ error: 'Prompt string is required' });
+    }
+
+    const imageUrl = await generateVisionImage(prompt);
+    res.json({ imageUrl, timestamp: new Date().toISOString() });
+  } catch (error) {
+    next(error);
+  }
+});
+

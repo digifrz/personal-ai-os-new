@@ -12,7 +12,7 @@ googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || '(default)');
+export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId || '(default)');
 export const storage = getStorage(app);
 
 // Connectivity validation constraint specified in system instructions

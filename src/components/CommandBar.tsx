@@ -18,6 +18,11 @@ import {
   Video,
   Mail,
   Bot,
+  Flame,
+  DollarSign,
+  Waves,
+  Dices,
+  ShieldAlert,
 } from 'lucide-react';
 import { ViewTab } from '../types';
 
@@ -32,6 +37,11 @@ interface CommandBarProps {
   onOpenSpotify?: () => void;
   onOpenGoogleWorkspace?: () => void;
   onOpenVideoCall?: () => void;
+  onToggleVoiceListener?: () => void;
+  onOpenRoastHype?: () => void;
+  onOpenDecisionWheel?: () => void;
+  onOpenSoundscape?: () => void;
+  onOpenEmergencyFocus?: () => void;
 }
 
 export const CommandBar: React.FC<CommandBarProps> = ({
@@ -45,6 +55,11 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   onOpenSpotify,
   onOpenGoogleWorkspace,
   onOpenVideoCall,
+  onToggleVoiceListener,
+  onOpenRoastHype,
+  onOpenDecisionWheel,
+  onOpenSoundscape,
+  onOpenEmergencyFocus,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -130,6 +145,62 @@ export const CommandBar: React.FC<CommandBarProps> = ({
           setActiveTab('tasks');
         }
       },
+    },
+    {
+      id: 'habits',
+      label: 'Smart Habit Tracker & Streaks',
+      hint: 'Check off daily rituals and view 52-week consistency heatmap',
+      icon: Flame,
+      color: '#F97316',
+      action: () => setActiveTab('habits'),
+    },
+    {
+      id: 'finance',
+      label: 'Personal Finance & Budget Ledger',
+      hint: 'Track income, expenses, subscriptions & net cash flow',
+      icon: DollarSign,
+      color: '#10B981',
+      action: () => setActiveTab('finance'),
+    },
+    {
+      id: 'vision',
+      label: 'Vision Board & Aspirations',
+      hint: 'Pin motivational images, affirmations & AI inspiration',
+      icon: Sparkles,
+      color: '#EC4899',
+      action: () => setActiveTab('vision'),
+    },
+    {
+      id: 'roast',
+      label: 'AI Motivation Coach & Workspace Roast',
+      hint: 'Humorous Gordon Ramsay roast, stadium hype & stoic wisdom',
+      icon: Flame,
+      color: '#F43F5E',
+      action: () => onOpenRoastHype && onOpenRoastHype(),
+    },
+    {
+      id: 'wheel',
+      label: 'Decision Wheel of Destiny',
+      hint: 'Spinning fortune wheel & quantum coin flip to eliminate hesitation',
+      icon: Dices,
+      color: '#8B5CF6',
+      action: () => onOpenDecisionWheel && onOpenDecisionWheel(),
+    },
+    {
+      id: 'soundscape',
+      label: 'Spatial Audio Focus Synthesizer',
+      hint: 'Generative cyberpunk rain, 432Hz alpha waves & ambient cafe',
+      icon: Waves,
+      color: '#06B6D4',
+      action: () => onOpenSoundscape && onOpenSoundscape(),
+    },
+    {
+      id: 'lockdown',
+      label: 'Emergency Deep Focus Lockdown',
+      hint: 'Distraction-free 25-minute Pomodoro protocol on single top task',
+      icon: ShieldAlert,
+      color: '#E11D48',
+      action: () => onOpenEmergencyFocus && onOpenEmergencyFocus(),
     },
     {
       id: 'search',
@@ -240,6 +311,16 @@ export const CommandBar: React.FC<CommandBarProps> = ({
       color: '#6366F1',
       action: () => {
         if (onOpenVideoCall) onOpenVideoCall();
+      },
+    },
+    {
+      id: 'voice_command',
+      label: 'Start Voice Control Listener',
+      hint: 'Speak commands: "create new task", "open calendar", "switch to assistant" (Web Speech API)',
+      icon: Mic,
+      color: '#8B5CF6',
+      action: () => {
+        if (onToggleVoiceListener) onToggleVoiceListener();
       },
     },
   ];

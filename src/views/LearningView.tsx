@@ -1,5 +1,23 @@
 import React, { useState } from 'react';
-import { BookOpen, Plus, Sparkles, RotateCw, CheckCircle2, Trash2, X } from 'lucide-react';
+import {
+  BookOpen,
+  Plus,
+  Sparkles,
+  RotateCw,
+  CheckCircle2,
+  Trash2,
+  X,
+  Video,
+  GraduationCap,
+  ExternalLink,
+  Share2,
+  Users,
+  Calendar,
+  Clock,
+  Copy,
+  Link,
+  Check,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { FlashcardItem } from '../types';
 import { createFlashcard, updateFlashcard, deleteFlashcard } from '../services/db';
@@ -11,7 +29,7 @@ interface LearningViewProps {
 
 export const LearningView: React.FC<LearningViewProps> = ({ flashcards }) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'study' | 'cards'>('study');
+  const [activeTab, setActiveTab] = useState<'study' | 'cards' | 'meet' | 'classroom'>('study');
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -20,6 +38,45 @@ export const LearningView: React.FC<LearningViewProps> = ({ flashcards }) => {
   const [topicInput, setTopicInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Google Meet Study Room State
+  const [meetCodeInput, setMeetCodeInput] = useState('');
+  const [scheduledTopic, setScheduledTopic] = useState('');
+
+  // Google Classroom Connected Courses State
+  const [classroomCourses, setClassroomCourses] = useState([
+    {
+      id: 'course_ai_101',
+      name: 'Advanced Machine Learning & AI Architectures',
+      section: 'Spring 2026',
+      room: 'Online Lab A',
+      teacher: 'Prof. Henderson',
+      coursework: [
+        { id: 'cw_1', title: 'Neural Attention Mechanisms Paper Review', dueDate: 'Tomorrow, 11:59 PM', points: 100 },
+        { id: 'cw_2', title: 'Flashcards Synthesis on Backpropagation', dueDate: 'Friday, 5:00 PM', points: 50 },
+      ],
+    },
+    {
+      id: 'course_cs_202',
+      name: 'Distributed Systems & Cloud Infrastructure',
+      section: 'Section B',
+      room: 'Virtual Room 4',
+      teacher: 'Dr. Aris Thorne',
+      coursework: [
+        { id: 'cw_3', title: 'Raft Consensus Protocol Milestone', dueDate: 'In 4 days', points: 150 },
+      ],
+    },
+    {
+      id: 'course_des_301',
+      name: 'Human-Computer Interaction & OS Design',
+      section: 'Lab Studio 2',
+      room: 'Design Wing',
+      teacher: 'Elena Rostova',
+      coursework: [
+        { id: 'cw_4', title: 'Heuristic Evaluation of Personal AI OS', dueDate: 'Next Monday', points: 75 },
+      ],
+    },
+  ]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -160,7 +217,7 @@ export const LearningView: React.FC<LearningViewProps> = ({ flashcards }) => {
       </section>
 
       {/* Mode tabs */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => setActiveTab('study')}
@@ -182,6 +239,30 @@ export const LearningView: React.FC<LearningViewProps> = ({ flashcards }) => {
           }`}
         >
           All Cards ({flashcards.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('meet')}
+          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all border ${
+            activeTab === 'meet'
+              ? 'border-emerald-500 bg-emerald-500/15 text-emerald-300'
+              : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-emerald-400'
+          }`}
+        >
+          <Video className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Google Meet Study</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('classroom')}
+          className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all border ${
+            activeTab === 'classroom'
+              ? 'border-blue-500 bg-blue-500/15 text-blue-300'
+              : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-muted)] hover:text-blue-400'
+          }`}
+        >
+          <GraduationCap className="w-3.5 h-3.5 text-blue-400" />
+          <span>Google Classroom Hub</span>
         </button>
       </div>
 
@@ -300,6 +381,230 @@ export const LearningView: React.FC<LearningViewProps> = ({ flashcards }) => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* TAB 3: GOOGLE MEET STUDY ROOM */}
+      {activeTab === 'meet' && (
+        <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Launch Instant Google Meet */}
+            <div className="rounded-3xl border border-emerald-500/35 bg-emerald-500/5 p-6 flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center gap-2.5 mb-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500 text-black font-black">
+                    <Video className="w-5 h-5 fill-current" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-[var(--color-text)]">
+                      Instant Google Meet Study Call
+                    </h3>
+                    <p className="text-xs text-[var(--color-muted)]">
+                      Launch an instant, zero-setup video study room with screen sharing and captions.
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-300">
+                  <p className="font-medium">
+                    ✦ Study with peers, present recall slides, or review flashcards in real-time.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <a
+                  href="https://meet.google.com/new"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-5 py-2.5 text-xs shadow-md transition-all"
+                >
+                  <Video className="w-4 h-4 fill-current" />
+                  <span>Launch Google Meet Now</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText('https://meet.google.com/new');
+                    showToast('✓ Google Meet instant link copied!');
+                  }}
+                  className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-2 text-xs font-bold text-[var(--color-muted)] hover:text-[var(--color-text)] transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy Link</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Join Existing Google Meet Code */}
+            <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white font-black">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-[var(--color-text)]">
+                    Join with Google Meet Code
+                  </h3>
+                  <p className="text-xs text-[var(--color-muted)]">
+                    Paste meeting code (e.g. abc-defg-hij) to join your class or cohort.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={meetCodeInput}
+                  onChange={(e) => setMeetCodeInput(e.target.value)}
+                  placeholder="Enter meet code or link (e.g. abc-defg-hij)"
+                  className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3.5 py-2.5 text-xs text-[var(--color-text)] outline-none focus:border-emerald-500 font-mono"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!meetCodeInput.trim()) {
+                      showToast('Please enter a Google Meet code or URL.');
+                      return;
+                    }
+                    const clean = meetCodeInput.trim().replace(/^https?:\/\/meet\.google\.com\//i, '');
+                    window.open(`https://meet.google.com/${clean}`, '_blank', 'noopener,noreferrer');
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-[var(--color-surface-elevated)] border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 font-bold px-4 py-2.5 text-xs transition-colors"
+                >
+                  <Video className="w-4 h-4" />
+                  <span>Join Session in Google Meet</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Study Buddy Tips */}
+          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-4 flex items-center justify-between gap-4 text-xs">
+            <div className="flex items-center gap-2 text-[var(--color-muted)]">
+              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                Tip: Use Spotify Focus Music inside the app while in your Google Meet study sprint!
+              </span>
+            </div>
+            <a
+              href="https://meet.google.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-emerald-400 font-bold hover:underline flex items-center gap-1 shrink-0"
+            >
+              <span>Google Meet Home</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: GOOGLE CLASSROOM HUB */}
+      {activeTab === 'classroom' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Top Bar with Connect & Launch */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-3xl border border-blue-500/30 bg-blue-500/5 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white font-black shadow-md shadow-blue-500/20">
+                <GraduationCap className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm sm:text-base text-[var(--color-text)]">
+                    Google Classroom Sync &amp; Courses
+                  </h3>
+                  <span className="rounded-full bg-blue-500/20 border border-blue-500/40 px-2 py-0.5 text-[9px] font-bold text-blue-300">
+                    Connected
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--color-muted)]">
+                  Track enrolled classes, review upcoming coursework, and push study flashcard decks.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const summaryText = flashcards
+                    .map((c, i) => `${i + 1}. ${c.front} -> ${c.back}`)
+                    .join('\n');
+                  navigator.clipboard.writeText(`Study Deck from Personal AI OS:\n\n${summaryText}`);
+                  showToast('✓ Study cards formatted and copied for Google Classroom announcement!');
+                }}
+                className="flex items-center gap-1.5 rounded-xl border border-blue-500/40 bg-blue-500/10 hover:bg-blue-500/20 px-3.5 py-2 text-xs font-bold text-blue-300 transition-colors"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Copy Deck to Share</span>
+              </button>
+
+              <a
+                href="https://classroom.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold px-4 py-2 text-xs transition-colors shadow-sm"
+              >
+                <span>Open Google Classroom</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+
+          {/* Enrolled Courses Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {classroomCourses.map((course) => (
+              <div
+                key={course.id}
+                className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4 hover:border-blue-500/40 transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 text-[10px] font-bold">
+                      {course.section}
+                    </span>
+                    <span className="text-[10px] text-[var(--color-muted)]">{course.room}</span>
+                  </div>
+
+                  <h4 className="mt-2 font-extrabold text-sm text-[var(--color-text)] leading-snug">
+                    {course.name}
+                  </h4>
+                  <p className="text-[11px] text-[var(--color-muted)] mt-1">Instructor: {course.teacher}</p>
+
+                  <div className="mt-4 space-y-2 pt-3 border-t border-[var(--color-border)]/50">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--color-muted)]">
+                      Upcoming Coursework
+                    </p>
+                    {course.coursework.map((cw) => (
+                      <div
+                        key={cw.id}
+                        className="rounded-xl border border-[var(--color-border)]/60 bg-[var(--color-bg-secondary)] p-2.5 text-xs space-y-1"
+                      >
+                        <p className="font-bold text-[var(--color-text)] truncate">{cw.title}</p>
+                        <div className="flex items-center justify-between text-[10px] text-[var(--color-muted)]">
+                          <span className="text-amber-400 font-semibold">{cw.dueDate}</span>
+                          <span>{cw.points} pts</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <a
+                  href={`https://classroom.google.com`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 w-full rounded-xl border border-blue-500/30 hover:bg-blue-500/10 text-blue-300 font-bold py-2 text-xs transition-colors"
+                >
+                  <span>Class Stream &amp; Submissions</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

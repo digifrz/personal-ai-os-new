@@ -27,10 +27,13 @@ import {
   Trash2,
   ExternalLink,
   AlertTriangle,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useVideoCall } from '../../context/VideoCallContext';
+import { useWindowManager } from '../../context/WindowManagerContext';
 import { DirectThreadItem, DirectMessageItem } from '../../types';
+import { ChatSettingsModal } from './ChatSettingsModal';
 import {
   subscribeDirectMessages,
   sendDirectMessage,
@@ -107,6 +110,7 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
 }) => {
   const { user, profile } = useAuth();
   const { startCall } = useVideoCall();
+  const { openWindow } = useWindowManager();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'unread' | 'groups'>('all');
@@ -124,6 +128,7 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [reportReason, setReportReason] = useState('Spam or Scam');
   const [reportDetails, setReportDetails] = useState('');
+  const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
 
   // Persisted Nicknames & Blocked Users in localStorage
   const [nicknames, setNicknames] = useState<Record<string, string>>(() => {
@@ -604,15 +609,30 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
               <div className="flex items-center gap-1 text-[var(--color-muted)]">
                 <button
                   type="button"
-                  onClick={() => startCall({
-                    contactName: displayedRecipientName,
-                    contactAvatar: recipientAvatar,
-                    type: 'video',
-                  })}
-                  className="p-2 rounded-full hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 transition-colors"
-                  title="Start Video Call"
+                  onClick={() => {
+                    openWindow({
+                      id: 'chat_' + activeThread.id,
+                      title: `💬 Chat: ${displayedRecipientName}`,
+                      icon: '💬',
+                      component: 'direct_chat',
+                      props: { thread: activeThread },
+                      defaultSize: { width: 440, height: 500 },
+                    });
+                    onShowToast(`Opened ${displayedRecipientName}'s chat in floating window`);
+                  }}
+                  className="p-2 rounded-full hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition-colors"
+                  title="Pop out into floating desktop window"
                 >
-                  <Video className="w-4 h-4" />
+                  <ExternalLink className="w-4 h-4" />
+                </button>
+                {/* Chat Settings (Image 3: Themes, Vanish Mode, Quick Replies, Mute) */}
+                <button
+                  type="button"
+                  onClick={() => setIsChatSettingsOpen(true)}
+                  className="p-2 rounded-full hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
+                  title="Chat Settings & Themes"
+                >
+                  <Settings className="w-4 h-4" />
                 </button>
                 <button
                   type="button"
@@ -1094,6 +1114,25 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
             </form>
           </div>
         </div>
+      )}
+      {/* Chat Settings Modal */}
+      {activeThread && (
+        <ChatSettingsModal
+          isOpen={isChatSettingsOpen}
+          onClose={() => setIsChatSettingsOpen(false)}
+          recipientName={displayedRecipientName}
+          recipientAvatar={recipientAvatar}
+          onShowToast={onShowToast}
+          onClearChat={() => {
+            setMessages([]);
+          }}
+          onBlockUser={() => {
+            handleToggleBlock();
+          }}
+          onReportUser={() => {
+            setIsReportModalOpen(true);
+          }}
+        />
       )}
     </div>
   );
