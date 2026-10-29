@@ -1,3 +1,5 @@
+export type ThemeSkin = 'deep_space' | 'cyberpunk' | 'terminal_green' | 'midnight_synth';
+
 export interface UserProfile {
   userId: string;
   name: string;
@@ -11,6 +13,7 @@ export interface UserProfile {
   followingCount?: number;
   isOnline?: boolean;
   theme?: 'dark' | 'light' | 'system';
+  themeSkin?: 'deep_space' | 'cyberpunk' | 'terminal_green' | 'midnight_synth';
   accentColor?: string;
   compactMode?: boolean;
   aiModel?: string;
@@ -443,5 +446,228 @@ export type ViewTab =
   | 'settings'
   | 'favorites'
   | 'recent'
-  | 'trash';
+  | 'trash'
+  | 'warrooms'
+  | 'simulation'
+  | 'fabric'
+  | 'viberooms'
+  | 'microdrops';
+
+// Next-Gen Unified Context Fabric Item
+export interface ContextFabricItem {
+  id: string;
+  sourceModule: 'notes' | 'tasks' | 'code' | 'diary' | 'chat' | 'files' | 'spotify' | 'calendar' | 'security';
+  title: string;
+  excerpt: string;
+  timestamp: string;
+  tags: string[];
+  entityId?: string;
+  correlationScore?: number;
+  metadata?: Record<string, any>;
+}
+
+// Next-Gen Multi-Agent War Room
+export interface WarRoomAgent {
+  id: string;
+  name: string;
+  role: 'architect' | 'security' | 'creative' | 'performance';
+  title: string;
+  avatar: string;
+  badge: string;
+  color: string;
+  specialty: string;
+  bias: string;
+}
+
+export interface WarRoomMessage {
+  id: string;
+  agentId: string;
+  agentName: string;
+  role: 'architect' | 'security' | 'creative' | 'performance' | 'director';
+  content: string;
+  timestamp: string;
+  critiqueOfAgentId?: string;
+  voteScore?: number;
+  tags?: string[];
+  proposedCode?: string;
+  actionItems?: string[];
+}
+
+export interface WarRoomMission {
+  id: string;
+  title: string;
+  objective: string;
+  status: 'active' | 'debating' | 'consensus' | 'executed';
+  activeAgents: string[];
+  messages: WarRoomMessage[];
+  synthesizedPlan?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Next-Gen Simulation & Sandbox Models
+export interface SimulationTopologyNode {
+  id: string;
+  label: string;
+  type: 'client' | 'gateway' | 'service' | 'auth' | 'database' | 'ai_agent';
+  status: 'healthy' | 'warning' | 'critical' | 'standby';
+  latencyMs: number;
+  requestsPerSec: number;
+  securityState: 'enforced' | 'audit_pending' | 'vulnerable';
+  x: number;
+  y: number;
+}
+
+export interface SimulationTopologyLink {
+  fromId: string;
+  toId: string;
+  protocol: 'HTTPS' | 'gRPC' | 'WSS' | 'TCP';
+  encrypted: boolean;
+  activePackets: number;
+}
+
+// Next-Gen Ephemeral Workspace
+export interface EphemeralWorkspace {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  createdAt: string;
+  activeModules: string[];
+  tags: string[];
+  isTemporary: boolean;
+}
+
+// ============================================================
+// 🔥 The Killer Feature: Shared Vibe Rooms (Micro-Social Productivity & Media Fusion)
+// ============================================================
+export interface VibeRoomMember {
+  id: string;
+  name: string;
+  avatar: string;
+  status: 'hacking' | 'deep_focus' | 'watching' | 'on_break';
+  currentTask?: string;
+  streakDays: number;
+  isMuted?: boolean;
+}
+
+export interface VibeRoomSharedTask {
+  id: string;
+  title: string;
+  authorName: string;
+  authorAvatar: string;
+  isCompleted: boolean;
+  category: string;
+  completedAt?: string;
+  cheersCount: number;
+}
+
+export interface VibeRoomMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  text: string;
+  type: 'chat' | 'task_celebration' | 'video_drop' | 'ai_synthesis' | 'micro_snippet';
+  reactions: Record<string, number>;
+  timestamp: string;
+  attachmentUrl?: string;
+}
+
+export interface VibeRoomVideo {
+  url: string;
+  title: string;
+  channel: string;
+  thumbnailUrl?: string;
+  durationSeconds: number;
+  currentSeconds: number;
+  isPlaying: boolean;
+  aiTakeaways: string[];
+  timestamps: Array<{ time: number; note: string; author: string }>;
+}
+
+export interface VibeRoomSprint {
+  mode: 'pomodoro' | 'deep_hack' | 'chill_study';
+  targetMinutes: number;
+  secondsRemaining: number;
+  isActive: boolean;
+  streakFlameCount: number;
+}
+
+export interface VibeRoom {
+  id: string;
+  code: string; // e.g. "VIBE-9421"
+  name: string;
+  tagline: string;
+  icon: string;
+  theme: 'cyberpunk' | 'neon_sunset' | 'emerald_matrix' | 'lofi_purple' | 'oled_minimal';
+  isPublic: boolean;
+  hostId: string;
+  hostName: string;
+  createdAt: string;
+  members: VibeRoomMember[];
+  activeVideo: VibeRoomVideo;
+  sprint: VibeRoomSprint;
+  sharedTasks: VibeRoomSharedTask[];
+  chatMessages: VibeRoomMessage[];
+  aiGroupVibe: {
+    lastSynthesizedAt?: string;
+    vibeScore: number;
+    vibeLabel: string;
+    weeklySummary?: string;
+    studyQuiz?: Array<{ question: string; options: string[]; answerIndex: number; explanation: string }>;
+    playfulRoast?: string;
+  };
+}
+
+// ============================================================
+// 🔥 The Feature: Micro-Drop Artifacts & Auto-Generated Daily Recaps
+// ============================================================
+export interface MicroDropArtifact {
+  id: string;
+  userId: string;
+  type: 'diary_voice' | 'diary_text' | 'task_hack' | 'video_timestamp' | 'ai_prompt' | 'quick_vibe';
+  title: string;
+  content: string;
+  metadata?: {
+    audioSeconds?: number;
+    codeLanguage?: string;
+    videoTitle?: string;
+    videoTimestamp?: string;
+    vibeEmoji?: string;
+    tags?: string[];
+  };
+  createdAt: string;
+  includedInRecap?: boolean;
+}
+
+export interface CreationBadge {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  unlockedAt?: string;
+  category: 'streak' | 'coding' | 'video' | 'reflection' | 'social';
+}
+
+export interface DailyRecapStory {
+  id: string;
+  date: string; // YYYY-MM-DD
+  theme: 'cyberpunk_oled' | 'sunset_aura' | 'emerald_matrix' | 'vaporwave' | 'minimalist_noir';
+  totalMicroDrops: number;
+  creationStreak: number;
+  vibeScore: number; // 0 - 100
+  vibeTitle: string; // e.g. "Level 9 Neural Architect"
+  vibeEmoji: string; // e.g. "⚡"
+  moodAura: string; // e.g. "Relentless Flow & Cosmic Clarity"
+  tasksHacksCracked: Array<{ title: string; tag: string }>;
+  topMediaWatched?: { title: string; takeaway: string; platform: string; timestamp?: string };
+  topAiInsight?: string;
+  audioDropsCount: number;
+  unlockedBadge?: CreationBadge;
+  shareableSummaryText: string;
+  generatedAt: string;
+}
+
 

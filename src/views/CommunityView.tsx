@@ -64,6 +64,7 @@ import { useVideoCall } from '../context/VideoCallContext';
 
 // Modals & Sub-views
 import { StoryViewerModal } from '../components/lounge/StoryViewerModal';
+import { CreateStoryModal } from '../components/lounge/CreateStoryModal';
 import { RulesPrivacyModal } from '../components/lounge/RulesPrivacyModal';
 import { ContactSupportModal } from '../components/lounge/ContactSupportModal';
 import { SharePostModal } from '../components/lounge/SharePostModal';
@@ -251,6 +252,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
   const [showContactModal, setShowContactModal] = useState(false);
   const [showAccountsCenter, setShowAccountsCenter] = useState(false);
   const [showPaymentsModal, setShowPaymentsModal] = useState(false);
+  const [showCreateStoryModal, setShowCreateStoryModal] = useState(false);
   const [profileModalUser, setProfileModalUser] = useState<{
     userId: string;
     displayName: string;
@@ -864,7 +866,10 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  setActiveThread(null);
+                  setActiveTab(tab.id as any);
+                }}
                 className={`flex items-center gap-1.5 whitespace-nowrap rounded-2xl px-4 py-2.5 transition-all ${
                   isTabActive
                     ? 'bg-gradient-to-r from-[var(--color-primary)] via-indigo-600 to-[var(--color-cyan)] text-white shadow-md'
@@ -881,7 +886,10 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
         <div className="flex items-center gap-1.5 shrink-0 pl-2">
           <button
             type="button"
-            onClick={() => setActiveTab('rooms')}
+            onClick={() => {
+              setActiveThread(null);
+              setActiveTab('rooms');
+            }}
             className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 border transition-all ${
               activeTab === 'rooms' || activeTab === 'communities'
                 ? 'border-[var(--color-cyan)] bg-[var(--color-cyan)]/15 text-[var(--color-cyan)]'
@@ -894,7 +902,10 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
 
           <button
             type="button"
-            onClick={() => setActiveTab('people')}
+            onClick={() => {
+              setActiveThread(null);
+              setActiveTab('people');
+            }}
             className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 border transition-all ${
               activeTab === 'people'
                 ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/15 text-[var(--color-primary)]'
@@ -1231,7 +1242,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
             }, 100);
           }}
           onSelectStory={(idx) => setActiveStoryIndex(idx)}
-          onUploadStoryClick={() => storyInputRef.current?.click()}
+          onUploadStoryClick={() => setShowCreateStoryModal(true)}
           onShowToast={showToast}
           accountType={accountType}
           onToggleAccountType={handleToggleAccountType}
@@ -1261,7 +1272,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
               {/* Your Story button */}
               <button
                 type="button"
-                onClick={() => storyInputRef.current?.click()}
+                onClick={() => setShowCreateStoryModal(true)}
                 className="group flex flex-col items-center gap-1.5 shrink-0 focus:outline-none"
               >
                 <div className="relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-[var(--color-primary)] bg-[var(--color-bg-secondary)] group-hover:border-[var(--color-primary-hover)] transition-all">
@@ -1968,6 +1979,10 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
           stories={stories}
           initialIndex={activeStoryIndex}
           onClose={() => setActiveStoryIndex(null)}
+          onSendDirectReply={(authorId, _replyText) => {
+            handleStartMessageWithUser(authorId, 'Member');
+            showToast('Direct reply sent!');
+          }}
         />
       )}
 
@@ -2068,6 +2083,16 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ posts: initialPost
         planTitle="Lounge Business Creator Suite"
         amount={15}
         currency="USD"
+        onShowToast={showToast}
+      />
+
+      {/* 24-Hour Story Creation & Upload Modal */}
+      <CreateStoryModal
+        isOpen={showCreateStoryModal}
+        onClose={() => setShowCreateStoryModal(false)}
+        onStoryCreated={(newStory) => {
+          setStories((prev) => [newStory, ...prev.filter((s) => s.id !== newStory.id)]);
+        }}
         onShowToast={showToast}
       />
     </div>

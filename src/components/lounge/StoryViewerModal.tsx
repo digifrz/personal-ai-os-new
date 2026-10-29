@@ -1,25 +1,69 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, Send, Heart, Play, Pause } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Send, Heart, Play, Pause, Eye, Share2, Check, Users } from 'lucide-react';
 import { StoryItem } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 interface StoryViewerModalProps {
   stories: StoryItem[];
   initialIndex: number;
   onClose: () => void;
+  onSendDirectReply?: (authorId: string, replyMessage: string) => void;
 }
 
 export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
   stories,
   initialIndex,
   onClose,
+  onSendDirectReply,
 }) => {
+  const { user, profile } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [reactions, setReactions] = useState<Array<{ id: number; emoji: string; x: number }>>([]);
   const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(12);
+  const [showViewersModal, setShowViewersModal] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const pressTimerRef = useRef<number | null>(null);
+
+  // Mock list of community members who viewed this story
+  const viewersList = [
+    {
+      id: 'usr_hidaya',
+      name: 'Hidaya Dhakwan',
+      username: 'hidaya_d',
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      time: '12m ago',
+      liked: true,
+    },
+    {
+      id: 'usr_farzan',
+      name: profile?.name || 'You',
+      username: profile?.username || 'member',
+      avatar: profile?.avatarUrl || '',
+      time: 'Just now',
+      liked: isLiked,
+    },
+    {
+      id: 'usr_alex',
+      name: 'Alex Rivera',
+      username: 'alex_code',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+      time: '45m ago',
+      liked: true,
+    },
+    {
+      id: 'usr_sarah',
+      name: 'Sarah Chen',
+      username: 'schen_design',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+      time: '2h ago',
+      liked: false,
+    },
+  ];
 
   // Sync index if initialIndex changes
   useEffect(() => {
@@ -116,8 +160,39 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
   const handleSendReply = (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim()) return;
+    const text = replyText.trim();
     handleSendReaction('💬');
+    onSendDirectReply?.(currentStory.userId, text);
+    setToastMessage(`Reply sent to ${currentStory.authorName}!`);
+    setTimeout(() => setToastMessage(null), 2500);
     setReplyText('');
+  };
+
+  const handleShareStory = () => {
+    try {
+      const shareUrl = `${window.location.origin}/#community?story=${currentStory.id}`;
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedShare(true);
+      setToastMessage('Story link copied to clipboard!');
+      setTimeout(() => {
+        setCopiedShare(false);
+        setToastMessage(null);
+      }, 2500);
+    } catch {
+      setToastMessage('Link ready to share!');
+      setTimeout(() => setToastMessage(null), 2000);
+    }
+  };
+
+  const handleToggleLike = () => {
+    const nextState = !isLiked;
+    setIsLiked(nextState);
+    setLikesCount((prev) => (nextState ? prev + 1 : Math.max(0, prev - 1)));
+    if (nextState) {
+      handleSendReaction('❤️');
+      setToastMessage('Liked story!');
+      setTimeout(() => setToastMessage(null), 1500);
+    }
   };
 
   const formatStoryTime = (isoString?: string) => {
@@ -257,12 +332,34 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            {/* Viewers trigger button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsPaused(true);
+                setShowViewersModal(true);
+              }}
+              title="See who saw my story"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/50 hover:bg-black/70 border border-white/20 text-[11px] font-bold text-white transition-all cursor-pointer"
+            >
+              <Eye className="w-3.5 h-3.5 text-pink-400" />
+              <span>{viewersList.length}</span>
+            </button>
+
             {isPaused && (
               <span className="flex items-center gap-1 text-[10px] font-bold bg-black/50 backdrop-blur-md px-2 py-0.5 rounded-full text-white/90">
                 <Pause className="w-2.5 h-2.5" /> Paused
               </span>
             )}
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-black/40 hover:bg-black/70 text-white transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -338,7 +435,7 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
             ))}
           </div>
 
-          {/* Reply Form */}
+          {/* Reply Form with Like, Share, and Send buttons */}
           <form onSubmit={handleSendReply} className="flex items-center gap-2">
             <div className="relative flex-1">
               <input
@@ -352,27 +449,107 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
               />
             </div>
 
-            {replyText.trim() ? (
+            {/* Like Heart Button with counter */}
+            <button
+              type="button"
+              onClick={handleToggleLike}
+              title={isLiked ? 'Unlike story' : 'Like story'}
+              className="flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1.5 text-white backdrop-blur-md hover:bg-white/20 transition active:scale-90 cursor-pointer"
+            >
+              <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} />
+              <span className="text-[11px] font-bold">{likesCount}</span>
+            </button>
+
+            {/* Share Button */}
+            <button
+              type="button"
+              onClick={handleShareStory}
+              title="Share story link"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 transition active:scale-90 cursor-pointer"
+            >
+              {copiedShare ? (
+                <Check className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+            </button>
+
+            {/* Send Reply Button */}
+            {replyText.trim() && (
               <button
                 type="submit"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-500 text-white shadow hover:bg-pink-600 transition"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-md hover:scale-105 transition cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLiked(!isLiked);
-                  if (!isLiked) handleSendReaction('❤️');
-                }}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 transition"
-              >
-                <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} />
               </button>
             )}
           </form>
         </div>
+
+        {/* Story Viewers Modal Sheet (Instagram Style) */}
+        {showViewersModal && (
+          <div className="absolute inset-x-0 bottom-0 top-1/3 z-40 flex flex-col rounded-t-3xl border-t border-white/15 bg-zinc-950/95 p-4 backdrop-blur-2xl animate-fade-in text-white select-none">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-pink-400" />
+                <h3 className="text-sm font-bold tracking-tight">
+                  Story Viewers ({viewersList.length})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowViewersModal(false);
+                  setIsPaused(false);
+                }}
+                className="p-1 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-2 space-y-2.5">
+              {viewersList.map((viewer) => (
+                <div
+                  key={viewer.id}
+                  className="flex items-center justify-between rounded-2xl p-2 hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={viewer.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
+                      alt={viewer.name}
+                      className="h-9 w-9 rounded-full object-cover border border-white/20"
+                    />
+                    <div>
+                      <div className="text-xs font-bold leading-tight">{viewer.name}</div>
+                      <div className="text-[10px] text-zinc-400 font-mono">
+                        @{viewer.username} • {viewer.time}
+                      </div>
+                    </div>
+                  </div>
+
+                  {viewer.liked && (
+                    <div className="flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-400">
+                      <Heart className="w-3 h-3 fill-red-500" />
+                      <span>Liked</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowViewersModal(false);
+                setIsPaused(false);
+              }}
+              className="mt-2 w-full rounded-2xl bg-white/10 hover:bg-white/20 py-2.5 text-xs font-bold text-white transition-colors cursor-pointer"
+            >
+              Resume Story
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

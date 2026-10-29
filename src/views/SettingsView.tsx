@@ -53,8 +53,10 @@ import {
   Eye,
   ArrowUpRight,
   Briefcase,
+  CreditCard,
+  Crown,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, ThemeSkin } from '../context/AuthContext';
 import {
   exportAllUserData,
   clearAllUserData,
@@ -68,6 +70,7 @@ import { FileItem, NoteItem, TaskItem, CommunityPostItem } from '../types';
 
 type SettingsTab =
   | 'profile'
+  | 'billing' // Payment Options, Stripe & Pro Plans
   | 'data' // Cloud Vault, Storage & Privacy
   | 'addons'
   | 'appearance'
@@ -109,6 +112,7 @@ interface SettingsViewProps {
   onNavigateTab?: (tab: string) => void;
   onForceRefresh?: () => void;
   isSyncing?: boolean;
+  onOpenUpgrade?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -120,8 +124,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onNavigateTab,
   onForceRefresh,
   isSyncing = false,
+  onOpenUpgrade,
 }) => {
-  const { user, profile, logout, updateUserProfile, accountType, toggleAccountType } = useAuth();
+  const { user, profile, logout, updateUserProfile, accountType, toggleAccountType, setThemeSkin, isPro } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
   // Form states
@@ -129,6 +134,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [bio, setBio] = useState(profile?.bio || '');
   const [username, setUsername] = useState(profile?.username || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatarUrl || '');
+  const [selectedSkin, setSelectedSkin] = useState<ThemeSkin>(profile?.themeSkin || 'deep_space');
   const [themeMode, setThemeMode] = useState<'dark' | 'light' | 'system'>(
     profile?.theme || 'dark'
   );
@@ -701,6 +707,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setUsername(profile.username || '');
       setAvatarUrl(profile.avatarUrl || '');
       if (profile.theme) setThemeMode(profile.theme);
+      if (profile.themeSkin) setSelectedSkin(profile.themeSkin as ThemeSkin);
       if (profile.accentColor) setAccentColor(profile.accentColor);
       if (profile.compactMode !== undefined) setCompactMode(profile.compactMode);
       if (profile.aiBehavior) setAiTone(profile.aiBehavior);
@@ -717,12 +724,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (!user) return;
     setSaveLoading(true);
     try {
+      if (selectedSkin) { await setThemeSkin(selectedSkin).catch(() => {}); }
       await updateUserProfile({
         name: name.trim(),
         bio: bio.trim(),
         username: username.trim().toLowerCase().replace(/[^a-z0-9_]/g, ''),
         avatarUrl,
         theme: themeMode,
+        themeSkin: selectedSkin,
         accentColor,
         compactMode,
         aiBehavior: aiTone,
@@ -784,6 +793,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Navigation Items
   const navItems = [
     { id: 'profile' as SettingsTab, label: 'Profile & Identity', icon: User },
+    { id: 'billing' as SettingsTab, label: 'Payment Options & Pro Plans', icon: CreditCard, badge: isPro ? 'PRO Active' : 'Upgrade' },
     { id: 'data' as SettingsTab, label: 'Cloud Vault, Storage & Privacy', icon: Database, badge: `${totalUsedMB}MB / 500MB` },
     { id: 'addons' as SettingsTab, label: 'Add-ons & Integrations', icon: Layers, badge: `${addons.filter(a => a.isEnabled).length} Active` },
     { id: 'appearance' as SettingsTab, label: 'Appearance & Themes', icon: Palette },
@@ -1801,6 +1811,54 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </p>
               </div>
 
+              
+              {/* Hacker Aesthetic & Visual Skins (Persisted to Firestore) */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-[var(--color-muted)]">
+                    Hacker Visual Skins &amp; Aesthetic Presets (Cloud Synced)
+                  </label>
+                  <span className="text-[10px] text-cyan-400 font-bold">
+                    Persists across all devices
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    { id: 'deep_space', label: 'Deep Space Glass', desc: 'Obsidian glass, violet nebula accents', border: 'border-purple-500/50', badge: 'Default' },
+                    { id: 'cyberpunk', label: 'Cyberpunk Neon', desc: 'Electric cyan and neon magenta glow', border: 'border-cyan-400/60', badge: 'High Voltage' },
+                    { id: 'terminal_green', label: 'Retro Terminal Green', desc: 'Emerald phosphor CRT monospace matrix', border: 'border-emerald-500/60', badge: 'CRT Matrix' },
+                    { id: 'midnight_synth', label: 'Midnight Synthwave', desc: 'Sunset purple, magenta dusk gradient', border: 'border-pink-500/60', badge: 'Sunset LoFi' },
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSkin(s.id as ThemeSkin);
+                        setThemeSkin(s.id as ThemeSkin).catch(() => {});
+                        showToast(`Activated ${s.label} visual skin!`);
+                      }}
+                      className={`rounded-2xl border p-3.5 text-left transition-all ${
+                        selectedSkin === s.id
+                          ? `${s.border} bg-[var(--color-primary)]/15 ring-2 ring-[var(--color-primary)]/40 shadow-lg scale-[1.01]`
+                          : 'border-[var(--color-border)] bg-[var(--color-bg-secondary)] hover:border-white/20'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <strong className="block text-xs font-bold text-[var(--color-text)] truncate">
+                          {s.label}
+                        </strong>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/10 text-white/80 font-bold shrink-0">
+                          {s.badge}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-[var(--color-muted)] block leading-snug">
+                        {s.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-[var(--color-muted)] mb-2">
                   Color Mode
@@ -2130,6 +2188,172 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <span>Open Full Guide &amp; Policies</span>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* TAB: MEMBERSHIP & PAYMENT OPTIONS */}
+          {activeTab === 'billing' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-text)] flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-purple-400" />
+                    <span>Payment Options &amp; Workspace Membership</span>
+                  </h2>
+                  <p className="text-xs text-[var(--color-muted)]">
+                    Real payment gateways: Stripe checkout, Apple Pay, Google Pay, PayPal, and UPI / Net Banking.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${
+                    isPro
+                      ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-black shadow-md'
+                      : 'bg-zinc-800 text-zinc-300 border border-white/10'
+                  }`}>
+                    {isPro ? '★ Pro Active' : 'Free Explorer Tier'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Supported Payment Channels Grid */}
+              <div className="rounded-3xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] p-5 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-text)] flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                  <span>Accepted Real Payment Methods</span>
+                </h3>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3.5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col items-center text-center gap-2">
+                    <span className="text-2xl">💳</span>
+                    <div>
+                      <strong className="block font-bold text-[var(--color-text)]">Stripe Checkout</strong>
+                      <span className="text-[10px] text-[var(--color-muted)]">Visa, Mastercard, Amex</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col items-center text-center gap-2">
+                    <span className="text-2xl">🍏</span>
+                    <div>
+                      <strong className="block font-bold text-[var(--color-text)]">Apple &amp; Google Pay</strong>
+                      <span className="text-[10px] text-[var(--color-muted)]">Instant 1-Tap Biometric</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col items-center text-center gap-2">
+                    <span className="text-2xl">🅿️</span>
+                    <div>
+                      <strong className="block font-bold text-[var(--color-text)]">PayPal One-Click</strong>
+                      <span className="text-[10px] text-[var(--color-muted)]">Global buyer protection</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] flex flex-col items-center text-center gap-2">
+                    <span className="text-2xl">⚡</span>
+                    <div>
+                      <strong className="block font-bold text-[var(--color-text)]">UPI &amp; Net Banking</strong>
+                      <span className="text-[10px] text-[var(--color-muted)]">QR &amp; Direct Bank Pay</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plans Comparison */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Free Tier */}
+                <div className="p-5 rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-[var(--color-text)]">Personal Free Tier</h4>
+                      <span className="text-[11px] text-[var(--color-muted)]">Essential personal OS</span>
+                    </div>
+                    <span className="text-lg font-black text-[var(--color-text)]">$0</span>
+                  </div>
+
+                  <ul className="space-y-2 text-xs text-[var(--color-muted)]">
+                    <li className="flex items-center gap-2 text-[var(--color-text)]">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>500 MB Encrypted Cloud Vault</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-[var(--color-text)]">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Standard Gemini AI Intelligence</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-[var(--color-text)]">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Lounge Community &amp; Public Posts</span>
+                    </li>
+                    <li className="flex items-center gap-2 text-[var(--color-text)]">
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Full Multi-Window Desktop HUD</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Pro Tier */}
+                <div className="p-5 rounded-3xl border-2 border-purple-500 bg-purple-500/10 space-y-4 shadow-xl relative overflow-hidden">
+                  <div className="absolute top-3 right-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    Recommended
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-[var(--color-text)] flex items-center gap-1.5">
+                        <Crown className="w-4 h-4 text-amber-400" />
+                        <span>Pro Autonomous Suite</span>
+                      </h4>
+                      <span className="text-[11px] text-purple-300">Unlimited power &amp; custom skins</span>
+                    </div>
+                    <div>
+                      <span className="text-lg font-black text-purple-300">$9.99</span>
+                      <span className="text-[10px] text-[var(--color-muted)]"> / month</span>
+                    </div>
+                  </div>
+
+                  <ul className="space-y-2 text-xs text-[var(--color-text)]">
+                    <li className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
+                      <span><strong>Unlimited Cloud Storage</strong> &amp; File Vault</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
+                      <span><strong>GPT-4o &amp; Gemini Pro</strong> with Memory Context</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
+                      <span><strong>Dynamic Room Soundtracks</strong> &amp; Visual Skins</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-3.5 h-3.5 text-purple-400" />
+                      <span><strong>Lounge Creator Badging</strong> &amp; Analytics</span>
+                    </li>
+                  </ul>
+
+                  <button
+                    type="button"
+                    onClick={() => onOpenUpgrade?.()}
+                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 hover:brightness-110 text-white font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    <span>Open Payment Options &amp; Upgrade to Pro</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Security & Refund Guarantee */}
+              <div className="p-4 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--color-muted)]">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>256-bit Bank Grade SSL Encryption · PCI-DSS Compliant Gateway · Cancel Anytime</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenUpgrade?.()}
+                  className="text-purple-400 hover:text-purple-300 font-bold underline shrink-0"
+                >
+                  View full checkout modal →
+                </button>
+              </div>
             </div>
           )}
         </main>

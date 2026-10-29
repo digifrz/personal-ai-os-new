@@ -20,7 +20,17 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, googleProvider, db, validateFirestoreConnection } from '../firebase';
-import { UserProfile } from '../types';
+import { UserProfile, ThemeSkin } from '../types';
+
+export type { ThemeSkin };
+
+export const applyThemeSkinToDOM = (skin?: string) => {
+  if (typeof document === 'undefined') return;
+  document.body.classList.remove('theme-cyberpunk', 'theme-terminal', 'theme-synthwave');
+  if (skin === 'cyberpunk') document.body.classList.add('theme-cyberpunk');
+  if (skin === 'terminal_green') document.body.classList.add('theme-terminal');
+  if (skin === 'midnight_synth') document.body.classList.add('theme-synthwave');
+};
 
 export type PremiumTier = 'free' | 'pro' | 'executive';
 
@@ -42,7 +52,12 @@ interface AuthContextType {
   accountType: 'personal' | 'business';
   setAccountType: (type: 'personal' | 'business') => Promise<void>;
   toggleAccountType: () => Promise<void>;
+  themeSkin: ThemeSkin;
+  setThemeSkin: (skin: ThemeSkin) => Promise<void>;
+  theme: 'dark' | 'light' | 'system';
+  setTheme: (theme: 'dark' | 'light' | 'system') => Promise<void>;
   premiumStatus: PremiumStatus;
+  isPro: boolean;
   setPremiumTier: (tier: PremiumTier) => Promise<void>;
   signInWithGoogle: () => Promise<boolean>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
@@ -60,6 +75,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Visual Theme Skin state: 'deep_space' | 'cyberpunk' | 'terminal_green' | 'midnight_synth'
+  const [localThemeSkin, setLocalThemeSkin] = useState<ThemeSkin>(() => {
+    try {
+      const saved = localStorage.getItem('paio_theme_skin') as ThemeSkin;
+      if (saved === 'deep_space' || saved === 'cyberpunk' || saved === 'terminal_green' || saved === 'midnight_synth') {
+        applyThemeSkinToDOM(saved);
+        return saved;
+      }
+    } catch {}
+    return 'deep_space';
+  });
+
+  const currentThemeSkin: ThemeSkin = (profile?.themeSkin as ThemeSkin) || localThemeSkin;
+
   // Global account mode state: 'personal' | 'business'
   const [localAccountType, setLocalAccountType] = useState<'personal' | 'business'>(() => {
     try {
@@ -69,13 +98,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return 'personal';
   });
 
-  // Subscription / Membership tier state
+  // Subscription / Membership tier state - Defaults strictly to 'free' until verified by backend
   const [localPremiumTier, setLocalPremiumTier] = useState<PremiumTier>(() => {
     try {
       const saved = localStorage.getItem('personal_ai_os_tier') as PremiumTier;
       if (saved === 'free' || saved === 'pro' || saved === 'executive') return saved;
     } catch {}
-    return 'pro';
+    return 'free';
   });
 
   const effectiveTier: PremiumTier = (profile?.membershipTier as PremiumTier) || localPremiumTier;
@@ -144,7 +173,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               });
               setProfile(newProfile);
             } else {
-              setProfile(userDoc.data() as UserProfile);
+              const loadedProfile = userDoc.data() as UserProfile;
+              setProfile(loadedProfile);
+              if (loadedProfile.themeSkin) {
+                setLocalThemeSkin(loadedProfile.themeSkin as ThemeSkin);
+                try {
+                  localStorage.setItem('paio_theme_skin', loadedProfile.themeSkin);
+                } catch {}
+                applyThemeSkinToDOM(loadedProfile.themeSkin);
+              }
             }
 
             // Listen for profile changes in real time
@@ -152,13 +189,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               userRef,
               (snap) => {
                 if (snap.exists()) {
-                  setProfile(snap.data() as UserProfile);
+                  const data = snap.data() as UserProfile;
+                  setProfile(data);
+                  if (data.membershipTier) {
+                    setLocalPremiumTier(data.membershipTier as PremiumTier);
+                  }
+                  if (data.themeSkin) {
+                    setLocalThemeSkin(data.themeSkin as ThemeSkin);
+                    try {
+                      localStorage.setItem('paio_theme_skin', data.themeSkin);
+                    } catch {}
+                    applyThemeSkinToDOM(data.themeSkin);
+                  }
+                  if (data.theme) {
+                    if (data.theme === 'light') {
+                      document.documentElement.classList.remove('dark');
+                      document.documentElement.classList.add('light');
+                    } else {
+                      document.documentElement.classList.remove('light');
+                      document.documentElement.classList.add('dark');
+                    }
+                  }
+                  if (data.accentColor) {
+                    document.documentElement.style.setProperty('--color-primary', data.accentColor);
+                  }
                 }
               },
               (err) => {
                 console.warn('User profile sync notice:', err?.message || err);
               }
             );
+
+            // Verify subscription entitlement with secure backend
+            currentUser.getIdToken().then((token) => {
+              fetch('/api/payments/status', {
+                headers: { Authorization: `Bearer ${token}` },
+              })
+                .then((r) => r.json())
+                .then((st) => {
+                  if (st?.tier) {
+                    setLocalPremiumTier(st.tier);
+                  }
+                })
+                .catch(() => {});
+            }).catch(() => {});
 
             setLoading(false);
             return () => unsubProfile();
@@ -300,9 +374,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem('personal_ai_os_tier', tier);
     } catch {}
+
     if (user) {
+      try {
+        const idToken = await user.getIdToken();
+        const resp = await fetch('/api/payments/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            plan: tier,
+            method: 'verified_gateway',
+            amount: tier === 'executive' ? 29 : tier === 'pro' ? 12 : 0,
+          }),
+        });
+        if (resp.ok) {
+          const result = await resp.json();
+          if (result.tier) {
+            setLocalPremiumTier(result.tier);
+          }
+        }
+      } catch (err) {
+        console.warn('Backend payment verification notice:', err);
+      }
+
       await updateUserProfile({ membershipTier: tier }).catch((err) => {
         console.warn('Could not sync membershipTier to Firestore profile:', err);
+      });
+    }
+  };
+
+  const setThemeSkin = async (skin: ThemeSkin) => {
+    setLocalThemeSkin(skin);
+    try {
+      localStorage.setItem('paio_theme_skin', skin);
+    } catch {}
+    applyThemeSkinToDOM(skin);
+    window.dispatchEvent(new CustomEvent('paio:theme-changed', { detail: skin }));
+    if (user) {
+      await updateUserProfile({ themeSkin: skin }).catch((err) => {
+        console.warn('Could not sync themeSkin to Firestore profile:', err);
+      });
+    }
+  };
+
+  const currentThemeMode: 'dark' | 'light' | 'system' = profile?.theme || 'dark';
+
+  const setTheme = async (mode: 'dark' | 'light' | 'system') => {
+    try {
+      localStorage.setItem('paio_theme_mode', mode);
+    } catch {}
+    if (mode === 'light') {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+    }
+    setProfile((prev) => (prev ? { ...prev, theme: mode } : null));
+    if (user) {
+      await updateUserProfile({ theme: mode }).catch((err) => {
+        console.warn('Could not sync theme to Firestore profile:', err);
       });
     }
   };
@@ -316,7 +450,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         accountType: currentAccountType,
         setAccountType,
         toggleAccountType,
+        themeSkin: currentThemeSkin,
+        setThemeSkin,
+        theme: currentThemeMode,
+        setTheme,
         premiumStatus,
+        isPro: premiumStatus.isPro,
         setPremiumTier,
         signInWithGoogle,
         signInWithEmail,

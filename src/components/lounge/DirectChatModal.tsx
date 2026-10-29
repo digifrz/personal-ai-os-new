@@ -21,6 +21,7 @@ import {
   sendDirectMessage,
 } from '../../services/db';
 import { ChatSettingsModal } from './ChatSettingsModal';
+import { VoiceNotePlayer } from './VoiceNotePlayer';
 
 interface DirectChatModalProps {
   thread: DirectThreadItem;
@@ -49,6 +50,8 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
   const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
     const unsub = subscribeDirectMessages(thread.id, (msgs) => {
@@ -63,7 +66,7 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
     return () => unsub();
   }, [thread.id]);
 
-  // Voice recording simulation
+  // Voice recording simulation and media recorder cleanup
   useEffect(() => {
     let interval: number;
     if (isRecording) {
@@ -72,7 +75,14 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
         setRecordingSeconds((prev) => prev + 1);
       }, 1000);
     }
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {}
+      }
+    };
   }, [isRecording]);
 
   const handleSend = async (e: React.FormEvent) => {
@@ -111,33 +121,90 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
 
   const handleToggleVoiceRecord = async () => {
     if (isRecording) {
-      // Finish recording and send voice note
       const duration = Math.max(1, recordingSeconds);
       setIsRecording(false);
 
-      try {
-        await sendDirectMessage(thread.id, {
-          threadId: thread.id,
-          senderId: user?.uid || 'guest',
-          senderName: profile?.name || user?.email?.split('@')[0] || 'Guest',
-          senderAvatar: profile?.avatarUrl || '',
-          content: `🎙 Voice note (${duration}s)`,
-        });
-        onShowToast('Voice note sent!');
-      } catch {
-        onShowToast('Could not send voice message.');
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.onstop = async () => {
+            try {
+              const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+              const reader = new FileReader();
+              reader.onloadend = async () => {
+                const dataUrl = reader.result as string;
+                await sendDirectMessage(thread.id, {
+                  threadId: thread.id,
+                  senderId: user?.uid || 'guest',
+                  senderName: profile?.name || user?.email?.split('@')[0] || 'Guest',
+                  senderAvatar: profile?.avatarUrl || '',
+                  content: `🎤 Voice note (${duration}s)`,
+                  attachments: [
+                    {
+                      name: `voice_note_${Date.now()}.webm`,
+                      url: dataUrl,
+                      type: 'audio/webm',
+                    },
+                  ],
+                });
+                onShowToast('Voice note recorded & sent!');
+              };
+              reader.readAsDataURL(audioBlob);
+            } catch {
+              sendFallbackVoiceNote(duration);
+            }
+          };
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current.stream?.getTracks().forEach((track) => track.stop());
+          return;
+        } catch {
+          sendFallbackVoiceNote(duration);
+        }
+      } else {
+        sendFallbackVoiceNote(duration);
       }
     } else {
+      audioChunksRef.current = [];
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const recorder = new MediaRecorder(stream);
+          recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunksRef.current.push(e.data);
+          };
+          mediaRecorderRef.current = recorder;
+          recorder.start(100);
+        }
+      } catch (err) {
+        console.warn('Microphone stream notice (synthesized voice fallback active):', err);
+      }
       setIsRecording(true);
       onShowToast('Recording voice note… tap mic again to send');
     }
   };
 
+  const sendFallbackVoiceNote = async (duration: number) => {
+    try {
+      await sendDirectMessage(thread.id, {
+        threadId: thread.id,
+        senderId: user?.uid || 'guest',
+        senderName: profile?.name || user?.email?.split('@')[0] || 'Guest',
+        senderAvatar: profile?.avatarUrl || '',
+        content: `🎤 Voice note (${duration}s)`,
+      });
+      onShowToast('Voice note sent!');
+    } catch {
+      onShowToast('Could not send voice message.');
+    }
+  };
+
+  // Determine realistic online status: check if other user is marked online or active recently
+  const isOnline = (thread as any)?.participantOnlineStatus?.[otherUserId] ?? false;
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[150] flex flex-col bg-[var(--color-bg)]"
+      className="fixed inset-0 bottom-12 sm:bottom-14 z-[90] flex flex-col bg-[var(--color-bg)] shadow-2xl animate-fade-in"
     >
       {/* Header */}
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 sm:px-6">
@@ -167,10 +234,17 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
             <h2 className="text-sm font-bold text-[var(--color-text)] sm:text-base leading-tight">
               {recipientName}
             </h2>
-            <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span>Online now</span>
-            </p>
+            {isOnline ? (
+              <p className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Online now</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-zinc-400 font-medium flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-zinc-600" />
+                <span>Offline • Last active recently</span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -234,9 +308,17 @@ export const DirectChatModal: React.FC<DirectChatModalProps> = ({
                   : 'bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text)]'
               }`}
             >
-              <div className="whitespace-pre-wrap break-words">{m.content}</div>
+              {m.content.includes('Voice note') || m.attachments?.some((a) => a.type?.startsWith('audio') || a.name.includes('voice_note')) ? (
+                <VoiceNotePlayer
+                  content={m.content}
+                  audioUrl={m.attachments?.find((a) => a.type?.startsWith('audio') || a.name.includes('voice_note'))?.url}
+                  isMine={isMine}
+                />
+              ) : (
+                <div className="whitespace-pre-wrap break-words">{m.content}</div>
+              )}
 
-              {m.attachments && m.attachments.length > 0 && (
+              {m.attachments && m.attachments.length > 0 && !m.content.includes('Voice note') && (
                 <div className="mt-2 space-y-1">
                   {m.attachments.map((att, i) => (
                     <a

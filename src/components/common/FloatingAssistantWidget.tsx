@@ -19,6 +19,7 @@ export interface FloatingAssistantWidgetProps {
   tasks: TaskItem[];
   notes: NoteItem[];
   onNavigateTab?: (tab: string) => void;
+  activeTab?: string;
 }
 
 interface Message {
@@ -33,6 +34,7 @@ export const FloatingAssistantWidget: React.FC<FloatingAssistantWidgetProps> = (
   tasks,
   notes,
   onNavigateTab,
+  activeTab,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [engine, setEngine] = useState<'gemini' | 'chatgpt'>('chatgpt'); // Default to ChatGPT as user requested!
@@ -129,32 +131,34 @@ export const FloatingAssistantWidget: React.FC<FloatingAssistantWidgetProps> = (
     }
   };
 
+  if (activeTab === 'assistant') return null;
+
   return (
     <>
-      {/* Floating launcher trigger button */}
+      {/* Floating launcher trigger button - safely elevated above bottom taskbar */}
       {!isOpen && (
         <button
           type="button"
           onClick={() => setIsOpen(true)}
           title="Open AI Assistant (ChatGPT & Gemini)"
-          className="fixed bottom-6 right-6 z-[90] flex items-center gap-2.5 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 p-3 sm:px-4 sm:py-3 text-white shadow-2xl hover:scale-110 active:scale-95 transition-all select-none hover:shadow-emerald-500/30 hover:shadow-2xl"
+          className="fixed bottom-16 sm:bottom-20 right-4 sm:right-6 z-[80] flex items-center gap-2.5 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 p-2.5 sm:px-4 sm:py-2.5 text-white shadow-2xl hover:scale-105 active:scale-95 transition-all select-none hover:shadow-emerald-500/30 hover:shadow-xl border border-white/20 backdrop-blur-md"
         >
           <div className="relative">
-            <Bot className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-300 animate-ping" />
+            <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-emerald-300 animate-ping" />
           </div>
           <span className="hidden sm:inline text-xs font-black tracking-tight">
             Ask Assistant
           </span>
-          <span className="rounded-full bg-black/30 px-1.5 py-0.5 text-[9px] font-mono text-emerald-300">
+          <span className="rounded-full bg-black/40 px-1.5 py-0.5 text-[9px] font-mono text-emerald-300 border border-white/10">
             {engine === 'chatgpt' ? 'GPT-4o' : 'Gemini'}
           </span>
         </button>
       )}
 
-      {/* Floating drawer modal */}
+      {/* Floating drawer modal - positioned above taskbar */}
       {isOpen && (
-        <div className="fixed bottom-4 right-4 z-[9995] flex flex-col w-[92vw] sm:w-[420px] h-[550px] max-h-[85vh] rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl overflow-hidden backdrop-blur-2xl animate-fade-in text-xs">
+        <div className="fixed bottom-16 sm:bottom-20 right-4 sm:right-6 z-[95] flex flex-col w-[92vw] sm:w-[420px] h-[540px] max-h-[calc(100vh-6rem)] rounded-3xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl overflow-hidden backdrop-blur-2xl animate-fade-in text-xs">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)]/70">
             <div className="flex items-center gap-2">

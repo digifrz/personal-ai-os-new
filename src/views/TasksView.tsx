@@ -24,6 +24,7 @@ import {
   Zap,
   ListChecks,
   ArrowRight,
+  Bell,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -49,6 +50,11 @@ import { createTask, updateTask, deleteTask, batchUpdateTaskOrders } from '../se
 import { askAI } from '../services/ai';
 import { EmptyState } from '../components/common/EmptyState';
 import { recordRecentAccess } from '../services/recentAccess';
+import {
+  notifyTaskReady,
+  requestWebNotificationPermission,
+  getWebNotificationPermission,
+} from '../services/webNotifications';
 
 interface TasksViewProps {
   tasks: TaskItem[];
@@ -425,6 +431,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
     onReorderTasks?.(updated);
 
     await updateTask(task.id, { status: nextStatus });
+    if (nextStatus === 'done') {
+      notifyTaskReady(task.title, 'Your task is complete and ready.');
+    }
     showNotification(nextStatus === 'done' ? 'Task marked complete!' : 'Task reopened.');
   };
 
@@ -540,6 +549,10 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
     showNotification(`Task moved to ${statusLabels[newStatus]}.`);
     await updateTask(taskId, { status: newStatus });
+    if (newStatus === 'done') {
+      const t = currentTasks.find((item) => item.id === taskId);
+      notifyTaskReady(t?.title || 'Workspace Task', 'Completed and ready on web.');
+    }
   };
 
   // ✦ Smart Planning AI Task Manager actions
@@ -871,6 +884,25 @@ Respond ONLY with valid JSON:
             {filter}
           </button>
         ))}
+
+        {/* Web Notification Permission Prompt */}
+        <button
+          type="button"
+          onClick={async () => {
+            const granted = await requestWebNotificationPermission();
+            if (granted) {
+              notifyTaskReady('Web Notifications Active', 'Personal AI OS will notify your browser when tasks are ready.');
+              showNotification('🔔 Web Notifications enabled! Ready tasks will notify your browser.');
+            } else {
+              showNotification('Notifications are disabled or blocked in browser settings.');
+            }
+          }}
+          className="flex items-center gap-1.5 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-3 py-1.5 text-xs font-bold text-yellow-300 hover:bg-yellow-500/20 transition-all shadow-sm cursor-pointer"
+          title="Enable native browser desktop notifications when tasks are ready"
+        >
+          <Bell className="w-3.5 h-3.5 text-yellow-400" />
+          <span>Web Alerts</span>
+        </button>
 
         {/* Sort selector */}
         <div className="flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-2.5 py-1.5 text-xs text-[var(--color-muted)]">

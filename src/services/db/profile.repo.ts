@@ -60,12 +60,13 @@ export async function markAllNotificationsRead(userId: string) {
 }
 
 export function subscribeCommunityProfiles(callback: (profiles: UserProfile[]) => void) {
-  const q = query(collection(db, 'users'), orderBy('name', 'asc'));
+  const q = query(collection(db, 'public_profiles'));
   return onSnapshot(
     q,
     (snapshot) => {
       const users: UserProfile[] = [];
       snapshot.forEach((d) => users.push(d.data() as UserProfile));
+      users.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       callback(users);
     },
     (err) => console.warn('Community profiles notice:', err?.message || err)
@@ -75,27 +76,67 @@ export function subscribeCommunityProfiles(callback: (profiles: UserProfile[]) =
 export async function updateUserProfile(userId: string, updates: Partial<UserProfile>) {
   validateProfileInput(updates);
   const userRef = doc(db, 'users', userId);
+  const publicRef = doc(db, 'public_profiles', userId);
   try {
-    return await updateDoc(userRef, {
+    const res = await updateDoc(userRef, {
       ...updates,
       updatedAt: new Date().toISOString(),
     });
+
+    // Mirror safe public discovery fields to public_profiles collection
+    const publicData: Record<string, any> = {
+      userId,
+      updatedAt: new Date().toISOString(),
+    };
+    if (updates.name !== undefined) publicData.name = updates.name;
+    if (updates.username !== undefined) publicData.username = updates.username;
+    if (updates.avatarUrl !== undefined) publicData.avatarUrl = updates.avatarUrl;
+    if (updates.bio !== undefined) publicData.bio = updates.bio;
+    if (updates.themeSkin !== undefined) publicData.themeSkin = updates.themeSkin;
+    if (updates.accentColor !== undefined) publicData.accentColor = updates.accentColor;
+
+    await setDoc(publicRef, publicData, { merge: true }).catch((e) => {
+      console.warn('Public profile mirror notice:', e);
+    });
+
+    return res;
   } catch (err) {
     throw AppError.from(err, 'INTERNAL');
   }
 }
 
-export async function toggleFollowUser(followerId: string, followingId: string, currentlyFollowing: boolean) {
+export async function toggleFollowUser(
+  followerId: string,
+  followingId: string,
+  currentlyFollowing: boolean,
+  followerName?: string
+) {
   const followDocId = `${followerId}_${followingId}`;
   const followRef = doc(db, 'community_follows', followDocId);
   if (currentlyFollowing) {
     return deleteDoc(followRef);
   } else {
-    return setDoc(followRef, {
+    const res = await setDoc(followRef, {
       followerId,
       followingId,
       createdAt: new Date().toISOString(),
     });
+
+    // Send lounge follower notification to the target user
+    addDoc(collection(db, 'notifications'), {
+      userId: followingId,
+      type: 'community',
+      title: 'New Follower in Lounge',
+      message: `${followerName || 'A workspace member'} started following you!`,
+      actorName: followerName || 'Workspace Member',
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      linkTab: 'community',
+    }).catch((e) => {
+      console.warn('Follower notification notice:', e);
+    });
+
+    return res;
   }
 }
 

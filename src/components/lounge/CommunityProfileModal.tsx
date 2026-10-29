@@ -96,7 +96,7 @@ export const CommunityProfileModal: React.FC<CommunityProfileModalProps> = ({
     setFollowersCount((prev) => Math.max(0, prev + (nextState ? 1 : -1)));
     // Silent update like Instagram - no toast
     try {
-      await toggleFollowUser(user.uid, targetUser.userId, !nextState);
+      await toggleFollowUser(user.uid, targetUser.userId, !nextState, myProfile?.name || user.email?.split('@')[0] || 'A member');
     } catch (e) {
       console.warn('Could not sync follow state:', e);
     }

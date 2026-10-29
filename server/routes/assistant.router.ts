@@ -14,6 +14,16 @@ const aiLimiter = createRateLimiter({ maxRequests: 60, windowMs: 60 * 1000 });
 
 assistantRouter.use(aiLimiter);
 
+assistantRouter.get('/health', async (_req: Request, res: Response) => {
+  const hasKey = !!process.env.GEMINI_API_KEY;
+  res.json({
+    status: hasKey ? 'operational' : 'missing_api_key',
+    geminiConfigured: hasKey,
+    defaultModel: 'gemini-3.8-flash',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 assistantRouter.post('/', async (req: Request, res: Response, next) => {
   try {
     const { prompt, mode, context, projectId, media, provider, openaiApiKey } = req.body;

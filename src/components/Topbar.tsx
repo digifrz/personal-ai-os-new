@@ -210,13 +210,19 @@ export const Topbar: React.FC<TopbarProps> = ({
       case 'learning':
         return 'Learning & Flashcards';
       case 'community':
-        return 'Community';
+        return 'The Lounge';
       case 'activity':
         return 'Activity History';
       case 'analytics':
         return 'Analytics';
       case 'settings':
         return 'Settings';
+      case 'warrooms':
+        return 'Multi-Agent War Rooms';
+      case 'simulation':
+        return 'Interactive Simulation & Sandbox';
+      case 'fabric':
+        return 'Unified Context Fabric';
       default:
         return 'Workspace';
     }
@@ -261,53 +267,6 @@ export const Topbar: React.FC<TopbarProps> = ({
 
         {/* PWA Install Button */}
         <PWAInstallButton />
-
-        {/* Daily Executive Briefing Button */}
-        {onOpenDailyBriefing && (
-          <button
-            type="button"
-            id="topbar-daily-briefing-btn"
-            onClick={onOpenDailyBriefing}
-            title="Open Autonomous Morning / Evening AI Executive Briefing"
-            className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-2.5 sm:px-3 py-1.5 text-xs font-bold text-amber-300 hover:border-amber-500 hover:bg-amber-500/20 transition-all shadow-sm group"
-          >
-            <Sun className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
-            <span className="hidden sm:inline">Daily Brief</span>
-          </button>
-        )}
-
-
-        {/* Spotify Quick Focus Player Button */}
-        {onOpenSpotify && (
-          <button
-            type="button"
-            id="topbar-spotify-btn"
-            onClick={onOpenSpotify}
-            title="Open Spotify Focus Player (Ambient Lo-Fi & Deep Work Music)"
-            className="flex items-center gap-1.5 rounded-xl border border-[#1DB954]/40 bg-[#1DB954]/10 p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold text-[#1DB954] hover:bg-[#1DB954]/20 transition-all shadow-sm group"
-          >
-            <Music className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
-            <span className="hidden md:inline">Focus Music</span>
-          </button>
-        )}
-
-        {/* Global Web Speech Voice Control Button */}
-        {onToggleVoiceListener && (
-          <button
-            type="button"
-            id="topbar-voice-listener-btn"
-            onClick={onToggleVoiceListener}
-            title={isVoiceListening ? "Voice commands active (Press V to stop)" : "Start Voice Commands (Press V)"}
-            className={`flex items-center gap-1.5 rounded-xl border p-1.5 sm:px-2.5 sm:py-1.5 text-xs font-bold transition-all shadow-sm group ${
-              isVoiceListening
-                ? 'border-violet-500 bg-violet-500/25 text-violet-300 ring-2 ring-violet-500/30'
-                : 'border-violet-500/30 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20'
-            }`}
-          >
-            <Mic className={`w-3.5 h-3.5 text-violet-400 group-hover:scale-110 transition-transform ${isVoiceListening ? 'animate-pulse text-red-400' : ''}`} />
-            <span className="hidden md:inline">{isVoiceListening ? 'Listening...' : 'Voice Control'}</span>
-          </button>
-        )}
 
 
 
@@ -677,19 +636,6 @@ export const Topbar: React.FC<TopbarProps> = ({
                     <span>{accountType === 'business' ? 'Switch to Personal' : 'Switch to Business'}</span>
                   </div>
                   <span className="text-[10px] font-bold text-[var(--color-primary)]">Toggle</span>
-                </button>
-
-                <button
-                  type="button"
-                  id="topbar-user-menu-about-btn"
-                  onClick={() => {
-                    setShowUserMenu(false);
-                    onOpenAbout();
-                  }}
-                  className="flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs text-[var(--color-muted)] hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>About & Privacy Policy</span>
                 </button>
 
                 <button

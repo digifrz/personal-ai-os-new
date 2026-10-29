@@ -50,6 +50,22 @@ import { DecisionWheelModal } from './components/common/DecisionWheelModal';
 import { AmbientSoundscapeStation } from './components/common/AmbientSoundscapeStation';
 import { EmergencyFocusMode } from './components/common/EmergencyFocusMode';
 import { NewUserQuickStartCard } from './components/common/NewUserQuickStartCard';
+import { WarRoomsView } from './views/WarRoomsView';
+import { SimulationSandboxView } from './views/SimulationSandboxView';
+import { ContextFabricHUD } from './components/common/ContextFabricHUD';
+import { AmbientVoiceStreamModal } from './components/common/AmbientVoiceStreamModal';
+import { InteractiveSmartVideoModal } from './components/common/InteractiveSmartVideoModal';
+import { VibeRoomsView } from './views/VibeRoomsView';
+import { MicroDropsView } from './views/MicroDropsView';
+import { QuickMicroDropModal } from './components/common/QuickMicroDropModal';
+import { DailyRecapStoryModal } from './components/common/DailyRecapStoryModal';
+import { ThemeSkinModal } from './components/common/ThemeSkinModal';
+import { GhostWriterCoPilot } from './components/common/GhostWriterCoPilot';
+import { OSContextMenu } from './components/common/OSContextMenu';
+import { LoungeAccountsCenterModal } from './components/lounge/LoungeAccountsCenterModal';
+import { microDropsService } from './services/microDrops';
+import { contextFabric } from './services/contextFabric';
+import { ephemeralWorkspaceService } from './services/ephemeralWorkspaces';
 
 import {
   TaskItem,
@@ -67,6 +83,7 @@ import {
   FinanceTransactionItem,
   VisionBoardItem,
   ViewTab,
+  DailyRecapStory,
 } from './types';
 
 import {
@@ -185,8 +202,17 @@ function WorkspaceApp() {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [isRoastHypeOpen, setIsRoastHypeOpen] = useState(false);
   const [isDecisionWheelOpen, setIsDecisionWheelOpen] = useState(false);
+  const [isThemeSkinOpen, setIsThemeSkinOpen] = useState(false);
+  const [isAccountsCenterOpen, setIsAccountsCenterOpen] = useState(false);
   const [isSoundscapeOpen, setIsSoundscapeOpen] = useState(false);
   const [isEmergencyFocusOpen, setIsEmergencyFocusOpen] = useState(false);
+  const [isContextFabricOpen, setIsContextFabricOpen] = useState(false);
+  const [isVoiceStreamModalOpen, setIsVoiceStreamModalOpen] = useState(false);
+  const [isSmartVideoModalOpen, setIsSmartVideoModalOpen] = useState(false);
+  const [isQuickDropModalOpen, setIsQuickDropModalOpen] = useState(false);
+  const [isStoryRecapModalOpen, setIsStoryRecapModalOpen] = useState(false);
+  const [activeStoryRecap, setActiveStoryRecap] = useState<DailyRecapStory | null>(() => microDropsService.getCurrentRecap());
+  const [activeWorkspace, setActiveWorkspace] = useState(() => ephemeralWorkspaceService.getActiveWorkspace());
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('personal-ai-os-sidebar-state') === 'collapsed';
@@ -243,6 +269,26 @@ function WorkspaceApp() {
       localStorage.setItem('ai_memory_enabled', String(enabled));
     } catch {}
   };
+
+  // Context Fabric & Ephemeral Workspace Snapshot Synchronization
+  useEffect(() => {
+    contextFabric.syncWorkspaceSnapshot({
+      tasks,
+      notes,
+      files,
+      events,
+    });
+  }, [tasks, notes, files, events]);
+
+  useEffect(() => {
+    const handleWorkspaceChanged = (e: any) => {
+      setActiveWorkspace(e.detail || ephemeralWorkspaceService.getActiveWorkspace());
+    };
+    window.addEventListener('paio:workspace-changed', handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener('paio:workspace-changed', handleWorkspaceChanged);
+    };
+  }, []);
 
   const logWorkspaceActivity = (
     action: string,
@@ -817,6 +863,93 @@ function WorkspaceApp() {
             onOpenEmergencyFocus={() => setIsEmergencyFocusOpen(true)}
           />
         );
+      case 'warrooms':
+        return (
+          <WarRoomsView
+            onNavigateTab={(tab) => setActiveTab(tab as any)}
+            onShowToast={(msg) => logWorkspaceActivity('warroom', 'agent', msg)}
+          />
+        );
+      case 'simulation':
+        return (
+          <SimulationSandboxView
+            onNavigateTab={(tab) => setActiveTab(tab as any)}
+            onShowToast={(msg) => logWorkspaceActivity('simulation', 'sandbox', msg)}
+          />
+        );
+      case 'fabric':
+        return (
+          <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-6 lg:px-8 space-y-6 animate-fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-cyan-500/30 bg-cyan-950/20 p-6 shadow-sm">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-black text-cyan-400">
+                    Unified Context Fabric Hub
+                  </span>
+                  <span className="rounded-full bg-cyan-500/20 border border-cyan-500/40 px-2.5 py-0.5 text-[10px] font-bold text-cyan-300">
+                    Live Reactive Memory
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--color-muted)] mt-1">
+                  Continuous cross-app state correlation stream across Tasks, Notes, Sandboxes, Security Audits, and Lounge threads.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsContextFabricOpen(true)}
+                className="rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold px-5 py-2.5 text-xs shadow-lg transition-all"
+              >
+                Inspect Live Context HUD
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-6 rounded-3xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+                <h4 className="font-extrabold text-base text-amber-400">Multi-Agent War Rooms</h4>
+                <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                  Autonomous agents debate architecture, security, UX, and latency in real time.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('warrooms')}
+                  className="rounded-xl bg-amber-500 text-black font-bold px-4 py-2 text-xs"
+                >
+                  Enter War Room &rarr;
+                </button>
+              </div>
+              <div className="p-6 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 space-y-3">
+                <h4 className="font-extrabold text-base text-emerald-400">Interactive Simulation & Sandbox</h4>
+                <p className="text-xs text-[var(--color-muted)] leading-relaxed">
+                  Multi-language code execution with live AI diagnostics and graphical network topology mapping.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('simulation')}
+                  className="rounded-xl bg-emerald-500 text-black font-bold px-4 py-2 text-xs"
+                >
+                  Launch Sandbox &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      case 'viberooms':
+        return (
+          <VibeRoomsView
+            onShowToast={(msg) => logWorkspaceActivity('vibe_room', 'room', msg)}
+            onOpenQuickDrop={() => setIsQuickDropModalOpen(true)}
+          />
+        );
+      case 'microdrops':
+        return (
+          <MicroDropsView
+            onShowToast={(msg) => logWorkspaceActivity('micro_drop', 'drop', msg)}
+            onOpenQuickDrop={() => setIsQuickDropModalOpen(true)}
+            onOpenRecapStory={(recap) => {
+              setActiveStoryRecap(recap);
+              setIsStoryRecapModalOpen(true);
+            }}
+          />
+        );
       case 'tasks':
         return (
           <TasksView
@@ -1018,6 +1151,7 @@ function WorkspaceApp() {
             onOpenAbout={() => setIsAboutModalOpen(true)}
             onForceRefresh={handleForceRefresh}
             isSyncing={isSyncing}
+            onOpenUpgrade={() => setIsUpgradeModalOpen(true)}
           />
         );
       default:
@@ -1164,6 +1298,15 @@ function WorkspaceApp() {
         onOpenDecisionWheel={() => setIsDecisionWheelOpen(true)}
         onOpenSoundscape={() => setIsSoundscapeOpen(true)}
         onOpenEmergencyFocus={() => setIsEmergencyFocusOpen(true)}
+        onOpenContextFabric={() => setIsContextFabricOpen(true)}
+        onOpenSmartVideo={() => setIsSmartVideoModalOpen(true)}
+        onOpenAmbientVoice={() => setIsVoiceStreamModalOpen(true)}
+        onOpenQuickDrop={() => setIsQuickDropModalOpen(true)}
+        onOpenRecapStory={async () => {
+          const recap = await microDropsService.generateDailyRecap();
+          setActiveStoryRecap(recap);
+          setIsStoryRecapModalOpen(true);
+        }}
       />
 
       {/* Authentication Modal */}
@@ -1175,10 +1318,7 @@ function WorkspaceApp() {
       {/* About App, Features, Privacy & Policies Modal */}
       <AboutAppModal
         isOpen={isAboutModalOpen}
-        onClose={() => {
-          setIsAboutModalOpen(false);
-          setHasSeenGuide(true);
-        }}
+        onClose={() => setIsAboutModalOpen(false)}
         onNavigateTab={(tab) => setActiveTab(tab)}
       />
 
@@ -1257,6 +1397,7 @@ function WorkspaceApp() {
       <FloatingAssistantWidget
         tasks={tasks}
         notes={notes}
+        activeTab={activeTab}
         onNavigateTab={(tab) => setActiveTab(tab as any)}
       />
 
@@ -1345,6 +1486,19 @@ function WorkspaceApp() {
         onOpenRoastHype={() => setIsRoastHypeOpen(true)}
         onOpenDecisionWheel={() => setIsDecisionWheelOpen(true)}
         onOpenSoundscape={() => setIsSoundscapeOpen(true)}
+        onOpenWarRooms={() => setActiveTab('warrooms')}
+        onOpenSimulation={() => setActiveTab('simulation')}
+        onOpenContextFabric={() => setIsContextFabricOpen(true)}
+        onOpenSmartVideo={() => setIsSmartVideoModalOpen(true)}
+        onOpenAmbientVoice={() => setIsVoiceStreamModalOpen(true)}
+        onOpenVibeRooms={() => setActiveTab('viberooms')}
+        onOpenQuickDrop={() => setIsQuickDropModalOpen(true)}
+        onOpenProfile={() => setActiveTab('community')}
+        onOpenAccountsCenter={() => setIsAccountsCenterOpen(true)}
+        onOpenSettings={() => setActiveTab('settings')}
+        onOpenThemes={() => setIsThemeSkinOpen(true)}
+        onOpenGhostWriter={() => window.dispatchEvent(new CustomEvent('paio:open-ghostwriter'))}
+        onOpenPayments={() => setIsUpgradeModalOpen(true)}
       />
 
       {/* Autonomous Morning & Evening AI Executive Briefing */}
@@ -1358,11 +1512,46 @@ function WorkspaceApp() {
         onNavigateTab={(tab) => setActiveTab(tab as any)}
       />
 
+      {/* Visual Skins & Dynamic Room Soundtrack Modal */}
+      <ThemeSkinModal
+        isOpen={isThemeSkinOpen}
+        onClose={() => setIsThemeSkinOpen(false)}
+        onShowToast={(msg) => logWorkspaceActivity('theme', 'skin', msg)}
+      />
+
+      {/* Lounge Accounts Center & Creator Tools Modal */}
+      <LoungeAccountsCenterModal
+        isOpen={isAccountsCenterOpen}
+        onClose={() => setIsAccountsCenterOpen(false)}
+        onShowToast={(msg) => logWorkspaceActivity('account', 'settings', msg)}
+        onOpenPayments={() => setIsUpgradeModalOpen(true)}
+      />
+
+      {/* AI Ghost-Writer Terminal & Chat Co-Pilot HUD */}
+      <GhostWriterCoPilot
+        activeTab={activeTab}
+        onOpenTasks={() => setActiveTab('tasks')}
+        onOpenNotes={() => setActiveTab('notes')}
+      />
+
       {/* Premium & Pro Tier Upgrade Modal */}
       <PremiumUpgradeModal
         isOpen={isUpgradeModalOpen}
         onClose={() => setIsUpgradeModalOpen(false)}
         onShowToast={(msg) => logWorkspaceActivity('upgraded', 'membership', msg)}
+      />
+
+      {/* Desktop Native OS Right-Click Context Menu */}
+      <OSContextMenu
+        onOpenTaskModal={() => setIsTaskEditorOpen(true)}
+        onOpenNoteModal={() => setIsNoteEditorOpen(true)}
+        onOpenAI={() => setActiveTab('assistant')}
+        onToggleGhostWriter={() => window.dispatchEvent(new CustomEvent('paio:open-ghostwriter'))}
+        onOpenThemeSkinModal={() => setIsThemeSkinOpen(true)}
+        onOpenUpgradeModal={() => setIsUpgradeModalOpen(true)}
+        onOpenSearch={() => setActiveTab('search')}
+        onShowToast={(msg) => logWorkspaceActivity('os', 'action', msg)}
+        onExportPDF={() => window.print()}
       />
 
       {/* Next-Gen Humorous AI Motivation & Procrastination Roast Coach */}
@@ -1396,6 +1585,127 @@ function WorkspaceApp() {
         tasks={tasks}
         onCompleteTask={handleToggleTaskStatus}
       />
+
+      {/* Next-Gen Unified Context Fabric HUD Slide-Over */}
+      <ContextFabricHUD
+        isOpen={isContextFabricOpen}
+        onClose={() => setIsContextFabricOpen(false)}
+        onNavigateTab={(tab) => setActiveTab(tab as any)}
+      />
+
+      {/* Voice-First Low-Latency Ambient Audio & Spatial Control with Interruption / Barge-in */}
+      <AmbientVoiceStreamModal
+        isOpen={isVoiceStreamModalOpen}
+        onClose={() => setIsVoiceStreamModalOpen(false)}
+        onNavigateTab={(tab) => setActiveTab(tab as any)}
+      />
+
+      {/* Interactive, Non-Linear & Immersive Video Player with Code Sniffer & Smart View */}
+      <InteractiveSmartVideoModal
+        isOpen={isSmartVideoModalOpen}
+        onClose={() => setIsSmartVideoModalOpen(false)}
+        onShowToast={(msg) => logWorkspaceActivity('video', 'media', msg)}
+      />
+
+      {/* Zero-Friction 2-Second Micro-Drop Modal */}
+      <QuickMicroDropModal
+        isOpen={isQuickDropModalOpen}
+        onClose={() => setIsQuickDropModalOpen(false)}
+        onShowToast={(msg) => logWorkspaceActivity('micro_drop', 'drop', msg)}
+      />
+
+      {/* Spotify Wrapped & IG Story Style Daily Story Recap Modal */}
+      {activeStoryRecap && (
+        <DailyRecapStoryModal
+          isOpen={isStoryRecapModalOpen}
+          onClose={() => setIsStoryRecapModalOpen(false)}
+          recap={activeStoryRecap}
+          onShowToast={(msg) => logWorkspaceActivity('story_recap', 'story', msg)}
+        />
+      )}
+
+      {/* Mobile Touch Bar (Android / iOS Haptic Bottom Bar) */}
+      <div className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-zinc-950/95 backdrop-blur-xl border-t border-white/10 px-2 py-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around shadow-2xl">
+        <button
+          type="button"
+          onClick={() => {
+            if (navigator.vibrate) navigator.vibrate(10);
+            setActiveTab('dashboard');
+          }}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${
+            activeTab === 'dashboard' ? 'text-indigo-400 font-bold' : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <span className="text-base">⚡</span>
+          <span className="text-[10px]">Home</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (navigator.vibrate) navigator.vibrate(15);
+            setActiveTab('viberooms');
+          }}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${
+            activeTab === 'viberooms' ? 'text-pink-400 font-bold' : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <span className="text-base">🔥</span>
+          <span className="text-[10px]">Vibes</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (navigator.vibrate) navigator.vibrate(15);
+            setIsQuickDropModalOpen(true);
+          }}
+          className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-purple-400 hover:text-purple-300 transition-all"
+        >
+          <span className="text-base">⚡</span>
+          <span className="text-[10px]">Drop</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (navigator.vibrate) navigator.vibrate(10);
+            setActiveTab('microdrops');
+          }}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${
+            activeTab === 'microdrops' ? 'text-purple-400 font-bold' : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <span className="text-base">✨</span>
+          <span className="text-[10px]">Recaps</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (navigator.vibrate) navigator.vibrate(15);
+            setIsContextFabricOpen(true);
+          }}
+          className="flex flex-col items-center gap-1 p-1.5 rounded-xl text-cyan-400 hover:text-cyan-300 transition-all"
+        >
+          <span className="text-base">🧠</span>
+          <span className="text-[10px]">Fabric</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (navigator.vibrate) navigator.vibrate(10);
+            setActiveTab('community');
+          }}
+          className={`flex flex-col items-center gap-1 p-1.5 rounded-xl transition-all ${
+            activeTab === 'community' ? 'text-indigo-400 font-bold' : 'text-zinc-400 hover:text-white'
+          }`}
+        >
+          <span className="text-base">💬</span>
+          <span className="text-[10px]">Lounge</span>
+        </button>
+      </div>
     </motion.div>
   );
 }

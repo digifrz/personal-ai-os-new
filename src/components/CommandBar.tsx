@@ -23,6 +23,8 @@ import {
   Waves,
   Dices,
   ShieldAlert,
+  Zap,
+  Code2,
 } from 'lucide-react';
 import { ViewTab } from '../types';
 
@@ -42,6 +44,11 @@ interface CommandBarProps {
   onOpenDecisionWheel?: () => void;
   onOpenSoundscape?: () => void;
   onOpenEmergencyFocus?: () => void;
+  onOpenContextFabric?: () => void;
+  onOpenSmartVideo?: () => void;
+  onOpenAmbientVoice?: () => void;
+  onOpenQuickDrop?: () => void;
+  onOpenRecapStory?: () => void;
 }
 
 export const CommandBar: React.FC<CommandBarProps> = ({
@@ -60,6 +67,11 @@ export const CommandBar: React.FC<CommandBarProps> = ({
   onOpenDecisionWheel,
   onOpenSoundscape,
   onOpenEmergencyFocus,
+  onOpenContextFabric,
+  onOpenSmartVideo,
+  onOpenAmbientVoice,
+  onOpenQuickDrop,
+  onOpenRecapStory,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -201,6 +213,78 @@ export const CommandBar: React.FC<CommandBarProps> = ({
       icon: ShieldAlert,
       color: '#E11D48',
       action: () => onOpenEmergencyFocus && onOpenEmergencyFocus(),
+    },
+    {
+      id: 'viberooms',
+      label: 'Shared Vibe Rooms (Co-Working & Watch Party)',
+      hint: 'Sync YouTube/videos, live sprint task streaks & AI group vibe synthesizer',
+      icon: Flame,
+      color: '#EC4899',
+      action: () => setActiveTab('viberooms'),
+    },
+    {
+      id: 'quick-microdrop',
+      label: 'Quick Micro-Drop (2-Sec Capture)',
+      hint: 'Capture 10s voice thought, terminal code hack, video reaction, or AI prompt',
+      icon: Zap,
+      color: '#8B5CF6',
+      action: () => onOpenQuickDrop && onOpenQuickDrop(),
+    },
+    {
+      id: 'microdrops',
+      label: 'Micro-Drops Feed & Creation Streaks',
+      hint: 'Timeline of daily artifacts, 4-day creation streak & unlockable badges',
+      icon: Sparkles,
+      color: '#A855F7',
+      action: () => setActiveTab('microdrops'),
+    },
+    {
+      id: 'daily-story-recap',
+      label: 'Daily Story Recap (Spotify Wrapped Style)',
+      hint: 'Full-screen visual story with mood aura, cracked hacks & top video takeaway',
+      icon: Sparkles,
+      color: '#EC4899',
+      action: () => onOpenRecapStory && onOpenRecapStory(),
+    },
+    {
+      id: 'warrooms',
+      label: 'Multi-Agent War Room',
+      hint: 'Autonomous strategic debate with Architect, Security, and UX agents',
+      icon: Zap,
+      color: '#F59E0B',
+      action: () => setActiveTab('warrooms'),
+    },
+    {
+      id: 'simulation',
+      label: 'Interactive Simulation Sandbox',
+      hint: 'Run JS/Python in sandbox & test graphical network topology',
+      icon: Code2,
+      color: '#38BDF8',
+      action: () => setActiveTab('simulation'),
+    },
+    {
+      id: 'fabric',
+      label: 'Unified Context Fabric HUD',
+      hint: 'Cross-app memory stream & real-time correlation engine',
+      icon: Brain,
+      color: '#06B6D4',
+      action: () => (onOpenContextFabric ? onOpenContextFabric() : setActiveTab('fabric')),
+    },
+    {
+      id: 'smart-video',
+      label: 'Smart Interactive Video Studio',
+      hint: 'Deep-searchable screencast, clickable code timeline & Smart View overlay',
+      icon: Video,
+      color: '#818CF8',
+      action: () => onOpenSmartVideo && onOpenSmartVideo(),
+    },
+    {
+      id: 'voice-stream',
+      label: 'Ambient Interruptible Voice Stream',
+      hint: 'Low-latency barge-in conversational voice with spatial audio orb',
+      icon: Mic,
+      color: '#EC4899',
+      action: () => onOpenAmbientVoice && onOpenAmbientVoice(),
     },
     {
       id: 'search',

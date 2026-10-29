@@ -36,6 +36,8 @@ import {
   FolderOpen,
   Key,
   SlidersHorizontal,
+  Printer,
+  ChevronDown,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AISettingsModal } from '../components/assistant/AISettingsModal';
@@ -54,6 +56,8 @@ import {
   createNote,
   createTask,
   createAIMemory,
+  deleteAIMemory,
+  clearAllAIMemories,
   createFlashcard,
   createCalendarEvent,
   createGoal,
@@ -121,27 +125,21 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     } catch (e) {
       console.warn('Could not read saved sessions:', e);
     }
-    // Default initial session
+    // Default initial fresh blank session
+    const defaultId = 'session_' + Date.now();
     return [
       {
-        id: 'session_welcome',
-        title: 'Workspace Assistant Welcome',
+        id: defaultId,
+        title: 'New Conversation',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        messages: [
-          {
-            id: 'welcome_init',
-            role: 'model',
-            text: "Hello! I am your Personal AI OS Assistant. I'm connected to your workspace data (tasks, notes, calendar, goals, and lounge activities). Feel free to ask me to analyze your tasks, summarize files, generate study flashcards, schedule events, or plan your day! You can also upload photos and documents for multimodal vision analysis.",
-            createdAt: new Date().toISOString(),
-          },
-        ],
+        messages: [],
       },
     ];
   });
 
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
-    return sessions[0]?.id || 'session_welcome';
+    return sessions[0]?.id || 'session_init';
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -411,6 +409,15 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 
   // Create a New Chat Session (ChatGPT / Gemini style)
   const handleCreateNewChat = () => {
+    const active = sessions.find((s) => s.id === activeSessionId);
+    if (active && active.messages.length === 0) {
+      setInputPrompt('');
+      setAttachedMediaList([]);
+      setRecentExecutedActions([]);
+      if (textareaRef.current) textareaRef.current.focus();
+      return;
+    }
+
     const newSession: ChatSession = {
       id: 'session_' + Date.now(),
       title: 'New Conversation',
@@ -671,6 +678,87 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     } catch (e) {
       showToast('Could not save to AI Memory.');
     }
+  };
+
+  // Export content to PDF or formatted printable document
+  const handleExportPDF = (textToPrint?: string) => {
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    const title = activeSession?.title || 'Personal AI Workspace Document';
+    const content = textToPrint ? (
+      `<div style="font-size: 14px; line-height: 1.8; white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        ${textToPrint.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+      </div>`
+    ) : (
+      messages.map(m => `
+        <div style="margin-bottom: 20px; padding: 16px; border-radius: 8px; background: ${m.role === 'user' ? '#f3f4f6' : '#ffffff'}; border: 1px solid #e5e7eb;">
+          <div style="font-weight: 800; font-size: 11px; text-transform: uppercase; color: ${m.role === 'user' ? '#4f46e5' : '#059669'}; margin-bottom: 8px;">
+            ${m.role === 'user' ? 'USER' : 'AI ASSISTANT'} · ${new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <div style="font-size: 13.5px; line-height: 1.7; white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+            ${m.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+          </div>
+        </div>
+      `).join('')
+    );
+
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              color: #111827;
+              padding: 40px;
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            header {
+              border-bottom: 2px solid #e5e7eb;
+              padding-bottom: 16px;
+              margin-bottom: 24px;
+            }
+            h1 {
+              font-size: 22px;
+              margin: 0 0 8px 0;
+              color: #111827;
+            }
+            .meta {
+              font-size: 12px;
+              color: #6b7280;
+            }
+            @media print {
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <header>
+            <h1>${title}</h1>
+            <div class="meta">Personal AI OS Document · Exported ${new Date().toLocaleDateString(undefined, { dateStyle: 'long', timeStyle: 'short' })}</div>
+          </header>
+          <div>${content}</div>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    showToast('Print / PDF document preview opened!');
+  };
+
+  const handleGenerateDocument = () => {
+    setInputPrompt('Draft a polished, comprehensive report and executive article on: ');
+    textareaRef.current?.focus();
   };
 
   // Quick Action Buttons
@@ -1037,7 +1125,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 
             {/* Top Bar Quick Controls & AI Engine Selector */}
             <div className="flex items-center gap-2">
-              {/* Engine Toggle */}
+              {/* ChatGPT Style Model Switcher Pill */}
               <div className="flex items-center rounded-xl bg-[var(--color-bg-secondary)] p-0.5 border border-[var(--color-border)]">
                 <button
                   type="button"
@@ -1051,7 +1139,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                       : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
                   }`}
                 >
-                  <span>🟢 ChatGPT</span>
+                  <span>GPT-4o</span>
                 </button>
                 <button
                   type="button"
@@ -1065,21 +1153,28 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                       : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
                   }`}
                 >
-                  <span>🌟 Gemini</span>
+                  <span>Gemini</span>
                 </button>
               </div>
 
-              {/* AI Memory Button inside Assistant UI */}
+              {/* Export to PDF / Formatted Document Button */}
+              <button
+                type="button"
+                onClick={() => handleExportPDF()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--color-border)] hover:border-cyan-500/50 bg-[var(--color-surface)] text-[var(--color-text)] hover:text-cyan-400 text-xs font-bold transition-all shadow-sm cursor-pointer"
+                title="Export conversation or document to PDF"
+              >
+                <Printer className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">Export PDF</span>
+              </button>
+
+              {/* AI Memory in Settings Button (ChatGPT Style) */}
               <button
                 type="button"
                 id="assistant-open-memory-btn"
-                onClick={() => setShowMemoryDrawer(!showMemoryDrawer)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm cursor-pointer ${
-                  showMemoryDrawer
-                    ? 'border-pink-500 bg-pink-500/20 text-pink-300 ring-2 ring-pink-500/30'
-                    : 'border-pink-500/30 bg-pink-500/10 text-pink-300 hover:bg-pink-500/20'
-                }`}
-                title="View & manage AI Long-Term Memory context"
+                onClick={() => setShowAISettingsModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-pink-500/30 bg-pink-500/10 text-pink-300 hover:bg-pink-500/20 text-xs font-bold transition-all shadow-sm cursor-pointer"
+                title="Manage AI Memory & Personalization inside Settings (ChatGPT Style)"
               >
                 <Brain className="w-3.5 h-3.5 text-pink-400" />
                 <span>Memory ({memories.length})</span>
@@ -1213,6 +1308,16 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                           <Brain className="w-3.5 h-3.5" />
                           <span>Save to Memory</span>
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleExportPDF(msg.text)}
+                          className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 hover:underline ml-1"
+                          title="Export this response to formatted PDF / Document"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>PDF</span>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1330,6 +1435,16 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
             >
               <CheckSquare className="w-3 h-3 text-cyan-400" />
               <span>+ Task</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleGenerateDocument}
+              className="flex items-center gap-1 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-bold text-cyan-300 hover:bg-cyan-500/20 shrink-0 transition-all"
+              title="Draft a polished document, report, or article for PDF export"
+            >
+              <Printer className="w-3 h-3 text-cyan-400" />
+              <span>+ PDF Document</span>
             </button>
 
             <button
@@ -1516,133 +1631,26 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
         </div>
       )}
 
-      {/* AI Assistant Settings Modal (Images 4 & 5) */}
+      {/* AI Assistant Settings Modal (ChatGPT Style with Memory & Custom Instructions) */}
       <AISettingsModal
         isOpen={showAISettingsModal}
         onClose={() => setShowAISettingsModal(false)}
         onShowToast={showToast}
+        memories={memories}
+        onDeleteMemory={async (id: string) => {
+          await deleteAIMemory(id);
+          showToast('Memory item removed.');
+        }}
+        onClearMemories={async () => {
+          if (user) {
+            await clearAllAIMemories(user.uid);
+            showToast('All memories cleared.');
+          }
+        }}
+        onAddMemory={async (fact: string) => {
+          await handleSaveToMemory(fact);
+        }}
       />
-
-      {/* Slide-Over AI Memory Drawer */}
-      {showMemoryDrawer && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-[120] flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in"
-          onClick={() => setShowMemoryDrawer(false)}
-        >
-          <div
-            className="w-full max-w-md h-full bg-[var(--color-surface)] border-l border-[var(--color-border)] p-5 shadow-2xl flex flex-col space-y-4 animate-slide-left text-xs"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--color-border)]">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-xl bg-pink-500/20 text-pink-400">
-                  <Brain className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm text-[var(--color-text)]">
-                    AI Memory &amp; Knowledge Context
-                  </h3>
-                  <span className="text-[10px] text-[var(--color-muted)]">
-                    {memories.length} active persistent fact(s)
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowMemoryDrawer(false)}
-                className="p-1 rounded-xl text-[var(--color-muted)] hover:text-[var(--color-text)]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Quick Add Fact Input */}
-            <div className="p-3 rounded-2xl border border-pink-500/30 bg-pink-500/5 space-y-2">
-              <span className="font-bold text-[var(--color-text)] block">
-                + Teach Assistant a New Fact
-              </span>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="e.g. My primary deadline is Nov 1st..."
-                  value={newMemorySnippet}
-                  onChange={(e) => setNewMemorySnippet(e.target.value)}
-                  onKeyDown={async (e) => {
-                    if (e.key === 'Enter' && newMemorySnippet.trim()) {
-                      await handleSaveToMemory(newMemorySnippet.trim());
-                      setNewMemorySnippet('');
-                    }
-                  }}
-                  className="flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-3 py-1.5 text-xs text-[var(--color-text)] outline-none focus:border-pink-500"
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!newMemorySnippet.trim()) return;
-                    await handleSaveToMemory(newMemorySnippet.trim());
-                    setNewMemorySnippet('');
-                  }}
-                  className="rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold px-3 py-1.5 text-xs transition-colors shrink-0"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-
-            {/* Memories List */}
-            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-              {memories.length === 0 ? (
-                <div className="p-6 text-center text-zinc-500 space-y-2">
-                  <Brain className="w-8 h-8 mx-auto opacity-40 text-pink-400" />
-                  <p>No memories recorded yet.</p>
-                  <p className="text-[10px]">
-                    Teach the assistant your preferences, work style, or project goals above!
-                  </p>
-                </div>
-              ) : (
-                memories.map((m) => (
-                  <div
-                    key={m.id}
-                    className="p-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] space-y-1 hover:border-pink-500/40 transition-colors"
-                  >
-                    <div className="flex items-center justify-between">
-                      <strong className="font-bold text-[var(--color-text)] truncate">
-                        {m.title || 'Workspace Memory'}
-                      </strong>
-                      <span className="text-[9px] font-bold text-pink-400 bg-pink-500/15 px-2 py-0.5 rounded-full shrink-0 ml-2">
-                        {m.type || 'Fact'}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-[var(--color-muted)] leading-relaxed">
-                      {m.content}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Footer */}
-            {onNavigate && (
-              <div className="pt-2 border-t border-[var(--color-border)] flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMemoryDrawer(false);
-                    onNavigate('memory');
-                  }}
-                  className="text-pink-400 hover:underline font-bold text-xs flex items-center gap-1"
-                >
-                  <span>Open Full AI Memory Vault →</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -28,12 +28,18 @@ import {
   ExternalLink,
   AlertTriangle,
   Settings,
+  Code2,
+  BarChart2,
+  Play,
+  Brain,
+  Zap,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useVideoCall } from '../../context/VideoCallContext';
 import { useWindowManager } from '../../context/WindowManagerContext';
 import { DirectThreadItem, DirectMessageItem } from '../../types';
 import { ChatSettingsModal } from './ChatSettingsModal';
+import { contextFabric } from '../../services/contextFabric';
 import {
   subscribeDirectMessages,
   sendDirectMessage,
@@ -69,7 +75,7 @@ const SEED_CHAT_MESSAGES: Record<string, DirectMessageItem[]> = {
       threadId: 'seed_alex',
       senderId: 'current',
       senderName: 'Me',
-      content: 'Thanks Alex! Added the 500 MB cloud storage quota and Google add-ons today too.',
+      content: '[POLL: What should we prioritize in next sprint? | Zero-Trust Token Verification | Context Fabric Streaming | WASM Virtual Sandbox]',
       createdAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
     },
     {
@@ -77,13 +83,21 @@ const SEED_CHAT_MESSAGES: Record<string, DirectMessageItem[]> = {
       threadId: 'seed_alex',
       senderId: 'seed_alex',
       senderName: 'Alex Chen',
-      content: 'Brilliant move. Let me know if you want to collaborate on the offline vector search.',
+      content: '[CODE: // Live Token Verifier\nconst testToken = "Bearer BQB_verified_token_99";\nconsole.log("Verified:", testToken.startsWith("Bearer "));]',
       createdAt: new Date(Date.now() - 8 * 60 * 1000).toISOString(),
+    },
+    {
+      id: 'm4',
+      threadId: 'seed_alex',
+      senderId: 'current',
+      senderName: 'Me',
+      content: '[CONTEXT_BUBBLE: Zero-Trust Architecture Spec | Verified mutual TLS and hardware keys from workspace notes]',
+      createdAt: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
     },
   ],
   seed_maya: [
     {
-      id: 'm4',
+      id: 'm5',
       threadId: 'seed_maya',
       senderId: 'seed_maya',
       senderName: 'Maya Lin',
@@ -91,11 +105,11 @@ const SEED_CHAT_MESSAGES: Record<string, DirectMessageItem[]> = {
       createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
     },
     {
-      id: 'm5',
+      id: 'm6',
       threadId: 'seed_maya',
       senderId: 'current',
       senderName: 'Me',
-      content: 'Appreciate it Maya! Built the Lounge messenger view now as well with HD video calls.',
+      content: '[SUBROOM: Security Deep-Dive: Token Rotation | Ephemeral thread for focused sub-topic]',
       createdAt: new Date(Date.now() - 90 * 60 * 1000).toISOString(),
     },
   ],
@@ -129,6 +143,50 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
   const [reportReason, setReportReason] = useState('Spam or Scam');
   const [reportDetails, setReportDetails] = useState('');
   const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
+
+  // Next-Gen Stateful & Fluid Threads state
+  const [pollVotes, setPollVotes] = useState<Record<string, number>>({});
+  const [runningCodes, setRunningCodes] = useState<Record<string, string>>({});
+  const [isWidgetsMenuOpen, setIsWidgetsMenuOpen] = useState(false);
+
+  const handleVotePoll = (msgId: string, optionIndex: number) => {
+    setPollVotes((prev) => ({ ...prev, [msgId]: optionIndex }));
+    onShowToast('Vote recorded on live poll.');
+  };
+
+  const handleRunChatCode = (msgId: string, codeString: string) => {
+    try {
+      const logs: string[] = [];
+      const orig = console.log;
+      console.log = (...args: any[]) => logs.push(args.join(' '));
+      const fn = new Function(codeString);
+      fn();
+      console.log = orig;
+      setRunningCodes((prev) => ({
+        ...prev,
+        [msgId]: logs.join('\n') || 'Execution complete (no output)',
+      }));
+      onShowToast('Inline code executed in sandbox.');
+    } catch (e: any) {
+      setRunningCodes((prev) => ({ ...prev, [msgId]: `Error: ${e.message}` }));
+    }
+  };
+
+  const handleInsertWidget = (type: 'poll' | 'code' | 'context' | 'subroom') => {
+    setIsWidgetsMenuOpen(false);
+    if (type === 'poll') {
+      setInputText('[POLL: Architecture Choice: Zero-Trust or Mutual TLS? | Zero-Trust Bearer | Mutual TLS | Biometric Enclave]');
+    } else if (type === 'code') {
+      setInputText('[CODE: const token = "BQB_valid_oauth_key";\nconsole.log("Token Verified:", token.length > 10);]');
+    } else if (type === 'context') {
+      const activeCtx = contextFabric.getItems()[0];
+      const title = activeCtx?.title || 'Zero-Trust Architecture Spec';
+      const excerpt = activeCtx?.excerpt || 'Mutual TLS and short-lived tokens';
+      setInputText(`[CONTEXT_BUBBLE: ${title} | ${excerpt.slice(0, 80)}]`);
+    } else if (type === 'subroom') {
+      setInputText('[SUBROOM: Security Deep-Dive: Token Rotation | Ephemeral thread for focused sub-topic]');
+    }
+  };
 
   // Persisted Nicknames & Blocked Users in localStorage
   const [nicknames, setNicknames] = useState<Record<string, string>>(() => {
@@ -685,7 +743,122 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
                           : 'bg-[var(--color-surface)] text-[var(--color-text)] border border-[var(--color-border)] rounded-tl-none'
                       }`}
                     >
-                      <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                      {(() => {
+                        if (msg.content.startsWith('[POLL:')) {
+                          const raw = msg.content.replace(/^\[POLL:\s*/, '').replace(/\]$/, '');
+                          const parts = raw.split('|').map((s) => s.trim());
+                          const question = parts[0] || 'Live Poll';
+                          const opts = parts.slice(1);
+                          return (
+                            <div className="space-y-2 p-3 rounded-xl bg-black/50 border border-amber-500/30 text-xs">
+                              <div className="flex items-center gap-1.5 text-amber-300 font-bold text-[11px]">
+                                <BarChart2 className="w-3.5 h-3.5" />
+                                <span>Live Interactive Poll</span>
+                              </div>
+                              <p className="font-semibold text-white">{question}</p>
+                              <div className="space-y-1.5">
+                                {opts.map((opt, idx) => {
+                                  const isVoted = pollVotes[msg.id] === idx;
+                                  const pct = isVoted ? 65 : 18;
+                                  return (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => handleVotePoll(msg.id, idx)}
+                                      className={`w-full text-left p-2 rounded-lg border text-[11px] transition-all relative overflow-hidden cursor-pointer ${
+                                        isVoted
+                                          ? 'border-amber-400 bg-amber-500/25 text-white font-bold'
+                                          : 'border-white/10 bg-white/5 hover:bg-white/10 text-zinc-300'
+                                      }`}
+                                    >
+                                      <div
+                                        style={{ width: `${pct}%` }}
+                                        className="absolute left-0 top-0 bottom-0 bg-amber-500/20 -z-0 transition-all duration-300"
+                                      />
+                                      <div className="relative z-10 flex items-center justify-between">
+                                        <span>{opt}</span>
+                                        {pollVotes[msg.id] !== undefined && (
+                                          <span className="font-mono text-[10px] text-amber-300">{pct}%</span>
+                                        )}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        if (msg.content.startsWith('[CODE:')) {
+                          const codeSnippet = msg.content.replace(/^\[CODE:\s*/, '').replace(/\]$/, '');
+                          return (
+                            <div className="space-y-2 p-2.5 rounded-xl bg-black/80 border border-cyan-500/40 text-xs font-mono">
+                              <div className="flex items-center justify-between text-[10px] text-cyan-400 font-sans pb-1 border-b border-white/10">
+                                <span className="flex items-center gap-1 font-bold">
+                                  <Code2 className="w-3.5 h-3.5" />
+                                  <span>Runnable Code Widget</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRunChatCode(msg.id, codeSnippet)}
+                                  className="px-2 py-0.5 rounded-md bg-cyan-500 hover:bg-cyan-400 text-black font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <Play className="w-2.5 h-2.5 fill-current" />
+                                  <span>Run</span>
+                                </button>
+                              </div>
+                              <pre className="text-cyan-300 whitespace-pre-wrap text-[11px] leading-tight overflow-x-auto max-h-36">
+                                {codeSnippet}
+                              </pre>
+                              {runningCodes[msg.id] && (
+                                <div className="p-2 rounded-lg bg-zinc-950 border border-white/10 text-[10px] text-emerald-300 font-mono">
+                                  <span className="text-zinc-500 block text-[9px] font-sans">Output:</span>
+                                  {runningCodes[msg.id]}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
+                        if (msg.content.startsWith('[CONTEXT_BUBBLE:')) {
+                          const raw = msg.content.replace(/^\[CONTEXT_BUBBLE:\s*/, '').replace(/\]$/, '');
+                          const [title, excerpt] = raw.split('|').map((s) => s.trim());
+                          return (
+                            <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-950/70 to-purple-950/50 border border-purple-500/40 text-xs space-y-1">
+                              <div className="flex items-center gap-1.5 text-purple-300 font-bold text-[10px]">
+                                <Brain className="w-3.5 h-3.5" />
+                                <span>Cross-App Context Bubble</span>
+                              </div>
+                              <h5 className="font-bold text-white text-[11px]">{title}</h5>
+                              <p className="text-[10px] text-zinc-300 leading-snug">{excerpt}</p>
+                            </div>
+                          );
+                        }
+
+                        if (msg.content.startsWith('[SUBROOM:')) {
+                          const raw = msg.content.replace(/^\[SUBROOM:\s*/, '').replace(/\]$/, '');
+                          const [title, desc] = raw.split('|').map((s) => s.trim());
+                          return (
+                            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-950/70 to-zinc-900 border border-emerald-500/40 text-xs space-y-1.5">
+                              <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[10px]">
+                                <Zap className="w-3.5 h-3.5" />
+                                <span>Ephemeral Sub-Room (Intent-Based Merging)</span>
+                              </div>
+                              <h5 className="font-bold text-white text-[11px]">{title}</h5>
+                              <p className="text-[10px] text-zinc-300 leading-snug">{desc}</p>
+                              <button
+                                type="button"
+                                onClick={() => onShowToast(`Joined ephemeral sub-room: "${title}"`)}
+                                className="w-full py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-[10px] transition-colors cursor-pointer"
+                              >
+                                Enter Sub-Room
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        return <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>;
+                      })()}
 
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="space-y-1 pt-1">
@@ -743,7 +916,7 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
                 </button>
               </div>
             ) : (
-              <footer className="flex items-center gap-2 border-t border-[var(--color-border)]/60 bg-[var(--color-surface)] p-3 z-10">
+              <footer className="flex items-center gap-2 border-t border-[var(--color-border)]/60 bg-[var(--color-surface)] p-3 z-10 relative">
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -752,6 +925,70 @@ export const WhatsAppInbox: React.FC<WhatsAppInboxProps> = ({
                 >
                   <Smile className="w-5 h-5" />
                 </button>
+
+                {/* Inline Dynamic Widgets Launcher */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsWidgetsMenuOpen(!isWidgetsMenuOpen)}
+                    className="p-2 rounded-full text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                    title="Insert Dynamic Interactive Widget or Context Bubble"
+                  >
+                    <Zap className="w-5 h-5" />
+                  </button>
+
+                  {isWidgetsMenuOpen && (
+                    <div className="absolute bottom-12 left-0 w-64 rounded-2xl bg-zinc-950 border border-amber-500/30 p-2 shadow-2xl space-y-1 z-50 text-xs animate-fade-in text-white">
+                      <span className="text-[10px] uppercase font-bold text-zinc-400 px-2 py-0.5 block">
+                        Stateful &amp; Fluid Widgets
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleInsertWidget('poll')}
+                        className="w-full text-left p-2 rounded-xl hover:bg-white/10 flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <BarChart2 className="w-4 h-4 text-amber-400 shrink-0" />
+                        <div>
+                          <p className="font-bold text-xs text-white">Live Interactive Poll</p>
+                          <p className="text-[10px] text-zinc-400">Embed dynamic voting</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInsertWidget('code')}
+                        className="w-full text-left p-2 rounded-xl hover:bg-white/10 flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <Code2 className="w-4 h-4 text-cyan-400 shrink-0" />
+                        <div>
+                          <p className="font-bold text-xs text-white">Runnable Code Widget</p>
+                          <p className="text-[10px] text-zinc-400">Execute code in-stream</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInsertWidget('context')}
+                        className="w-full text-left p-2 rounded-xl hover:bg-white/10 flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <Brain className="w-4 h-4 text-purple-400 shrink-0" />
+                        <div>
+                          <p className="font-bold text-xs text-white">Cross-App Context Bubble</p>
+                          <p className="text-[10px] text-zinc-400">Link active notes/tasks</p>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInsertWidget('subroom')}
+                        className="w-full text-left p-2 rounded-xl hover:bg-white/10 flex items-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <Zap className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div>
+                          <p className="font-bold text-xs text-white">Ephemeral Sub-Room</p>
+                          <p className="text-[10px] text-zinc-400">Spin up focused sub-thread</p>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 <button
                   type="button"

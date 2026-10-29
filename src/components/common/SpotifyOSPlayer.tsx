@@ -20,6 +20,8 @@ import {
   ListMusic,
   Disc3,
   SlidersHorizontal,
+  Copy,
+  User,
 } from 'lucide-react';
 import { SpotifyPlaylistSummary } from '../../types';
 
@@ -136,11 +138,27 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
       return '';
     }
   });
+  const [spotifyClientId, setSpotifyClientId] = useState<string>(() => {
+    try {
+      return localStorage.getItem('paio_spotify_client_id') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [userProfile, setUserProfile] = useState<{ displayName: string; avatarUrl?: string; product?: string } | null>(() => {
+    try {
+      const saved = localStorage.getItem('paio_spotify_user_profile');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  });
   const [isTokenEditorOpen, setIsTokenEditorOpen] = useState(false);
   const [tempToken, setTempToken] = useState(spotifyToken);
+  const [tempClientId, setTempClientId] = useState(spotifyClientId);
   const [isConnecting, setIsConnecting] = useState(false);
   const [apiConnected, setApiConnected] = useState<boolean>(() => !!spotifyToken);
   const [showFullSongList, setShowFullSongList] = useState(true);
+  const [copiedRedirect, setCopiedRedirect] = useState(false);
 
   // Add custom playlist state
   const [isAddingPlaylist, setIsAddingPlaylist] = useState(false);
@@ -169,6 +187,29 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
     try {
       localStorage.setItem('paio_spotify_personal_playlists', JSON.stringify(lists));
     } catch {}
+  };
+
+  // Fetch Spotify user profile
+  const fetchUserProfile = async (tokenToUse?: string) => {
+    const effectiveToken = tokenToUse !== undefined ? tokenToUse : spotifyToken;
+    if (!effectiveToken) return;
+    try {
+      const res = await fetch(`/api/integrations/spotify/me?token=${encodeURIComponent(effectiveToken)}`);
+      const data = await res.json();
+      if (data.success && data.user) {
+        const profile = {
+          displayName: data.user.displayName || 'Spotify Member',
+          avatarUrl: data.user.avatarUrl,
+          product: data.user.product,
+        };
+        setUserProfile(profile);
+        try {
+          localStorage.setItem('paio_spotify_user_profile', JSON.stringify(profile));
+        } catch {}
+      }
+    } catch (err) {
+      console.warn('Could not fetch Spotify profile:', err);
+    }
   };
 
   // Fetch personal playlists using Spotify Web API
@@ -200,7 +241,28 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
     }
   };
 
-  // Spotify OAuth Callback Token extraction from URL Hash
+  // Listen for OAuth postMessage callback from popup window
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SPOTIFY_AUTH_SUCCESS' && event.data?.token) {
+        const token = event.data.token;
+        setSpotifyToken(token);
+        setApiConnected(true);
+        try {
+          localStorage.setItem('paio_spotify_web_token', token);
+        } catch {}
+        fetchPlaylistsFromApi(token);
+        fetchUserProfile(token);
+        setIsTokenEditorOpen(false);
+      } else if (event.data?.type === 'SPOTIFY_AUTH_ERROR') {
+        console.warn('Spotify auth error:', event.data.error);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [personalPlaylists]);
+
+  // Spotify OAuth Callback Token extraction from URL Hash if opened in direct redirect
   useEffect(() => {
     if (typeof window !== 'undefined' && window.location.hash.includes('access_token=')) {
       try {
@@ -211,6 +273,7 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
           setApiConnected(true);
           localStorage.setItem('paio_spotify_web_token', token);
           fetchPlaylistsFromApi(token);
+          fetchUserProfile(token);
           window.history.replaceState(null, '', window.location.pathname);
         }
       } catch (e) {
@@ -219,40 +282,66 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
     }
   }, []);
 
-  const handleSpotifyOAuthSignIn = () => {
-    const clientId = localStorage.getItem('paio_spotify_client_id') || '4a5e3a89025e40e695d73673752e5052';
-    const redirectUri = window.location.origin;
-    const scopes = encodeURIComponent(
-      'playlist-read-private playlist-read-collaborative user-read-playback-state user-top-read user-read-recently-played'
-    );
-    const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&scope=${scopes}&show_dialog=true`;
+  // Spotify OAuth Sign-In Flow
+  const handleSpotifyOAuthSignIn = async () => {
+    setIsConnecting(true);
+    try {
+      const redirectUri = `${window.location.origin}/auth/spotify/callback`;
+      const clientId = spotifyClientId.trim() || '4a5e3a89025e40e695d73673752e5052';
 
-    const popup = window.open(authUrl, 'spotify-auth', 'width=520,height=720,left=250,top=100');
-    if (!popup) {
-      window.location.href = authUrl;
+      let authUrl = '';
+      try {
+        const res = await fetch(
+          `/api/integrations/spotify/auth-url?redirectUri=${encodeURIComponent(redirectUri)}&clientId=${encodeURIComponent(clientId)}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          authUrl = data.url;
+        }
+      } catch {}
+
+      if (!authUrl) {
+        const scopes = encodeURIComponent(
+          'playlist-read-private playlist-read-collaborative user-read-playback-state user-top-read user-read-recently-played'
+        );
+        authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(
+          redirectUri
+        )}&scope=${scopes}&show_dialog=true`;
+      }
+
+      const popup = window.open(authUrl, 'spotify-auth', 'width=520,height=720,left=250,top=100');
+      if (!popup) {
+        window.location.href = authUrl;
+      }
+    } catch (err) {
+      console.error('Failed to initiate Spotify OAuth:', err);
+    } finally {
+      setIsConnecting(false);
     }
   };
 
   const handleInstantDemoConnect = async () => {
     setIsConnecting(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    await new Promise((resolve) => setTimeout(resolve, 500));
     const token = 'BQB_verified_token_' + Date.now();
     setSpotifyToken(token);
     setApiConnected(true);
     try {
       localStorage.setItem('paio_spotify_web_token', token);
     } catch {}
-    fetchPlaylistsFromApi(token);
+    await fetchPlaylistsFromApi(token);
+    await fetchUserProfile(token);
     setIsConnecting(false);
+    setIsTokenEditorOpen(false);
   };
 
   const handleDisconnectSpotify = () => {
     setSpotifyToken('');
     setApiConnected(false);
+    setUserProfile(null);
     try {
       localStorage.removeItem('paio_spotify_web_token');
+      localStorage.removeItem('paio_spotify_user_profile');
     } catch {}
   };
 
@@ -260,6 +349,7 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
   useEffect(() => {
     if (isOpen && spotifyToken) {
       fetchPlaylistsFromApi();
+      fetchUserProfile();
     }
   }, [isOpen]);
 
@@ -438,16 +528,19 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
         </div>
       )}
 
-      {/* Main Expanded Player Window - Always preserved in DOM so music never stops when minimized! */}
+      {/* Main Expanded Player Window - Kept inside viewport bounds so browser never throttles background iframe audio */}
       <div
         style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          opacity: isMinimized ? 0 : 1,
+          left: isMinimized ? `${Math.max(16, position.x)}px` : `${position.x}px`,
+          top: isMinimized ? `${Math.max(16, position.y)}px` : `${position.y}px`,
+          width: isMinimized ? '280px' : undefined,
+          height: isMinimized ? '70px' : undefined,
+          opacity: isMinimized ? 0.001 : 1,
           pointerEvents: isMinimized ? 'none' : 'auto',
-          transform: isMinimized ? 'scale(0.001)' : 'scale(1)',
-          transformOrigin: 'top left',
-          transition: 'opacity 0.2s ease, transform 0.2s ease',
+          zIndex: isMinimized ? 9980 : 9990,
+          clipPath: isMinimized ? 'inset(0 0 0 0)' : undefined,
+          overflow: isMinimized ? 'hidden' : undefined,
+          transition: 'opacity 0.15s ease',
         }}
         className="fixed z-[9990] w-88 sm:w-[430px] rounded-3xl border border-emerald-500/35 bg-zinc-950/95 shadow-2xl backdrop-blur-2xl overflow-hidden select-none animate-fade-in text-white flex flex-col max-h-[85vh]"
       >
@@ -484,8 +577,14 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
                 : 'border-[#1DB954]/50 bg-[#1DB954]/15 text-[#1DB954] hover:bg-[#1DB954]/25 shadow-xs'
             }`}
           >
-            <Key className="w-3 h-3" />
-            <span>{apiConnected ? 'Linked' : 'Sign In'}</span>
+            {userProfile?.avatarUrl ? (
+              <img src={userProfile.avatarUrl} alt="" className="w-3.5 h-3.5 rounded-full object-cover" />
+            ) : (
+              <Key className="w-3 h-3" />
+            )}
+            <span className="truncate max-w-[90px]">
+              {apiConnected ? (userProfile?.displayName ? userProfile.displayName.split(' ')[0] : 'Linked') : 'Sign In'}
+            </span>
           </button>
           <button
             type="button"
@@ -508,7 +607,7 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
 
       {/* Spotify OAuth & Token Configuration Drawer */}
       {isTokenEditorOpen && (
-        <div className="p-3.5 bg-zinc-900 border-b border-white/10 space-y-3 animate-fade-in text-xs">
+        <div className="p-3.5 bg-zinc-900 border-b border-white/10 space-y-3 animate-fade-in text-xs max-h-80 overflow-y-auto">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
               <Key className="w-3.5 h-3.5 text-[#1DB954]" />
@@ -519,12 +618,12 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
                 ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold'
                 : 'text-zinc-500'
             }`}>
-              {apiConnected ? '● Connected' : 'Not Linked'}
+              {apiConnected ? (userProfile?.displayName ? `● ${userProfile.displayName}` : '● Connected') : 'Not Linked'}
             </span>
           </div>
 
           <p className="text-[11px] text-zinc-400 leading-normal">
-            Sign in with your personal Spotify account to auto-sync your private playlists, listen continuously across views, and view your listening analytics.
+            Sign in with your personal Spotify account to auto-sync your private playlists, listen continuously across views, and enjoy uninterrupted background focus audio.
           </p>
 
           {/* Quick OAuth Actions */}
@@ -532,10 +631,11 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
             <button
               type="button"
               onClick={handleSpotifyOAuthSignIn}
-              className="flex-1 py-2 px-3 rounded-xl bg-[#1DB954] hover:bg-[#1ed760] text-black font-black text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+              disabled={isConnecting}
+              className="flex-1 py-2 px-3 rounded-xl bg-[#1DB954] hover:bg-[#1ed760] text-black font-black text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Music className="w-3.5 h-3.5 fill-black" />
-              <span>Sign in with Spotify</span>
+              <span>{isConnecting ? 'Connecting…' : 'Sign in with Spotify'}</span>
             </button>
 
             <button
@@ -543,8 +643,9 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
               onClick={handleInstantDemoConnect}
               disabled={isConnecting}
               className="py-2 px-3 rounded-xl border border-[#1DB954]/50 bg-[#1DB954]/10 hover:bg-[#1DB954]/20 text-[#1DB954] font-bold text-xs transition-all cursor-pointer disabled:opacity-50"
+              title="Instant 1-click sync with demo personal playlists"
             >
-              {isConnecting ? 'Connecting…' : '⚡ 1-Click Sync'}
+              ⚡ Instant Sync
             </button>
 
             {apiConnected && (
@@ -557,6 +658,58 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
                 Sign out
               </button>
             )}
+          </div>
+
+          {/* OAuth Callback URI Display */}
+          <div className="pt-2 border-t border-white/10 space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] text-zinc-400">
+              <span className="font-semibold">OAuth Callback Redirect URI:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const uri = `${window.location.origin}/auth/spotify/callback`;
+                  navigator.clipboard.writeText(uri);
+                  setCopiedRedirect(true);
+                  setTimeout(() => setCopiedRedirect(false), 2000);
+                }}
+                className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer"
+              >
+                {copiedRedirect ? <Check className="w-2.5 h-2.5" /> : <Copy className="w-2.5 h-2.5" />}
+                <span>{copiedRedirect ? 'Copied' : 'Copy URI'}</span>
+              </button>
+            </div>
+            <div className="bg-black/60 rounded-lg px-2.5 py-1.5 font-mono text-[10px] text-zinc-300 truncate select-all border border-white/5">
+              {typeof window !== 'undefined' ? `${window.location.origin}/auth/spotify/callback` : '/auth/spotify/callback'}
+            </div>
+          </div>
+
+          {/* Custom Spotify Client ID */}
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-zinc-400 block">
+              Spotify App Client ID (optional override):
+            </span>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="4a5e3a89025e40e695d73673752e5052"
+                value={tempClientId}
+                onChange={(e) => setTempClientId(e.target.value)}
+                className="flex-1 rounded-xl bg-black/60 border border-white/10 px-3 py-1.5 text-xs text-white outline-none focus:border-[#1DB954]"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const clean = tempClientId.trim();
+                  setSpotifyClientId(clean);
+                  try {
+                    localStorage.setItem('paio_spotify_client_id', clean);
+                  } catch {}
+                }}
+                className="rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold px-3 py-1.5 text-xs transition-colors shrink-0 cursor-pointer"
+              >
+                Save ID
+              </button>
+            </div>
           </div>
 
           {/* Advanced Manual Token Entry */}
@@ -631,9 +784,90 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
         {/* TAB 1: PERSONAL PLAYLISTS */}
         {activeTab === 'personal' && (
           <div className="space-y-2.5">
+            {/* Spotify Sign-in Banner when not linked */}
+            {!apiConnected ? (
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-950/80 via-zinc-900 to-black border border-[#1DB954]/40 shadow-lg space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-[#1DB954] flex items-center justify-center text-black font-black shadow-sm">
+                      <Music className="w-4 h-4 fill-black" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-xs text-white">Sign In to Spotify</h4>
+                      <p className="text-[10px] text-zinc-400">Fetch &amp; play your personal playlists</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-[#1DB954]/15 border border-[#1DB954]/30 px-2 py-0.5 text-[9px] font-bold text-[#1DB954]">
+                    OAuth 2.0
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-zinc-300 leading-snug">
+                  Sign in with your Spotify account to hear your personal playlists and keep music playing in the background while you work.
+                </p>
+
+                <div className="flex items-center gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={handleSpotifyOAuthSignIn}
+                    disabled={isConnecting}
+                    className="flex-1 py-2 px-3 rounded-xl bg-[#1DB954] hover:bg-[#1ed760] text-black font-black text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Music className="w-3.5 h-3.5 fill-black" />
+                    <span>{isConnecting ? 'Opening Spotify…' : 'Sign in with Spotify'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleInstantDemoConnect}
+                    disabled={isConnecting}
+                    className="py-2 px-3 rounded-xl border border-[#1DB954]/50 bg-[#1DB954]/10 hover:bg-[#1DB954]/20 text-[#1DB954] font-bold text-xs transition-all cursor-pointer disabled:opacity-50"
+                    title="Instant 1-click sync with demo personal playlists"
+                  >
+                    ⚡ Instant Sync
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-2.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  {userProfile?.avatarUrl ? (
+                    <img src={userProfile.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover border border-emerald-500/40 shrink-0" />
+                  ) : (
+                    <span className="h-2 w-2 rounded-full bg-[#1DB954] animate-pulse shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <span className="truncate text-emerald-300 font-bold text-[11px] block">
+                      {userProfile?.displayName || 'Personal Spotify Account'}
+                    </span>
+                    <span className="text-[9px] text-zinc-400 block truncate">
+                      {personalPlaylists.length} playlists synced · continuous playback
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => fetchPlaylistsFromApi()}
+                    disabled={isConnecting}
+                    title="Refresh playlists from Spotify"
+                    className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isConnecting ? 'animate-spin text-[#1DB954]' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDisconnectSpotify}
+                    className="text-[10px] text-red-400 hover:text-red-300 px-1.5 py-0.5 rounded-md hover:bg-red-500/10 transition-colors"
+                  >
+                    Unlink
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                Your Personal Playlists
+                Your Personal Playlists ({personalPlaylists.length})
               </span>
               <div className="flex items-center gap-1">
                 <button
@@ -870,7 +1104,7 @@ export const SpotifyOSPlayer: React.FC<SpotifyOSPlayerProps> = ({ isOpen, onClos
           height={showFullSongList ? '380' : '152'}
           frameBorder="0"
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-          loading="lazy"
+          loading="eager"
           className="rounded-2xl shadow-lg border border-white/10 transition-all duration-300"
           title={`Spotify Player: ${activePlaylistTitle}`}
         />

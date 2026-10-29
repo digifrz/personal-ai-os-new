@@ -10,6 +10,18 @@ export interface AskAIOptions {
   media?: Array<{ data: string; mimeType: string; name?: string }>;
 }
 
+export async function checkAIHealth(): Promise<{ status: string; geminiConfigured: boolean; defaultModel?: string }> {
+  try {
+    const res = await fetch('/api/assistant/health');
+    if (res.ok) {
+      return await res.json();
+    }
+    return { status: 'offline', geminiConfigured: false };
+  } catch {
+    return { status: 'unreachable', geminiConfigured: false };
+  }
+}
+
 export async function askAI(options: AskAIOptions): Promise<string> {
   try {
     const response = await fetch('/api/assistant', {
@@ -21,14 +33,30 @@ export async function askAI(options: AskAIOptions): Promise<string> {
     });
 
     if (!response.ok) {
-      console.warn(`[AI Client] Server response status ${response.status}, activating smart client fallback.`);
+      const errText = await response.text().catch(() => '');
+      console.warn(`[AI Client] Server response status ${response.status}: ${errText}. Transparent fallback activated.`);
+      window.dispatchEvent(
+        new CustomEvent('paio:ai-status', {
+          detail: { isLive: false, errorStatus: response.status, notice: 'Live API unreachable; using local engine' },
+        })
+      );
       return localClientAIEngine(options);
     }
 
     const data = await response.json();
+    window.dispatchEvent(
+      new CustomEvent('paio:ai-status', {
+        detail: { isLive: true, model: data.model || 'gemini-3.8-flash' },
+      })
+    );
     return data.answer || localClientAIEngine(options);
-  } catch (err) {
-    console.warn('[AI Client] Network or endpoint unreachable, utilizing local engine:', err);
+  } catch (err: any) {
+    console.warn('[AI Client] Network unreachable, activating transparent local fallback:', err?.message || err);
+    window.dispatchEvent(
+      new CustomEvent('paio:ai-status', {
+        detail: { isLive: false, error: err?.message, notice: 'Network offline; using local engine' },
+      })
+    );
     return localClientAIEngine(options);
   }
 }

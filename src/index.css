@@ -46,6 +46,46 @@ body.light-mode {
   --color-overlay: rgba(244, 247, 251, 0.85);
 }
 
+body.theme-cyberpunk {
+  --color-primary: #06B6D4;
+  --color-primary-hover: #22D3EE;
+  --color-secondary: #EC4899;
+  --color-bg: #050814;
+  --color-bg-secondary: #0A0F24;
+  --color-surface: #0E1630;
+  --color-surface-elevated: #15224A;
+  --color-border: #1E2D58;
+  --color-text: #E0F2FE;
+  --color-cyan: #22D3EE;
+}
+
+body.theme-terminal {
+  --color-primary: #10B981;
+  --color-primary-hover: #34D399;
+  --color-secondary: #059669;
+  --color-bg: #020C07;
+  --color-bg-secondary: #04170E;
+  --color-surface: #062417;
+  --color-surface-elevated: #093321;
+  --color-border: #0F4C32;
+  --color-text: #D1FAE5;
+  --font-body: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-heading: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+body.theme-synthwave {
+  --color-primary: #F43F5E;
+  --color-primary-hover: #FB7185;
+  --color-secondary: #A855F7;
+  --color-bg: #110521;
+  --color-bg-secondary: #190930;
+  --color-surface: #240C45;
+  --color-surface-elevated: #331260;
+  --color-border: #4C1D7A;
+  --color-text: #FDF2F8;
+  --color-gold: #FBBF24;
+}
+
 * {
   box-sizing: border-box;
 }

@@ -12,6 +12,7 @@
         "bio": { "type": "string" },
         "username": { "type": "string" },
         "theme": { "type": "string", "enum": ["dark", "light", "system"] },
+        "themeSkin": { "type": "string", "enum": ["deep_space", "cyberpunk", "terminal_green", "midnight_synth"] },
         "accentColor": { "type": "string" },
         "compactMode": { "type": "boolean" },
         "aiModel": { "type": "string" },
@@ -66,6 +67,21 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["userId", "title"]
+    },
+    "DiaryEntry": {
+      "title": "DiaryEntry",
+      "description": "Daily journal and diary entry",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "content": { "type": "string" },
+        "mood": { "type": "string" },
+        "tags": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "date", "content"]
     },
     "FileMetadata": {
       "title": "FileMetadata",

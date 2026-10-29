@@ -29,6 +29,9 @@ import {
   Layers,
   Flame,
   DollarSign,
+  Zap,
+  Code2,
+  Network,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { ViewTab } from '../types';
@@ -99,14 +102,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
     },
     {
-      label: 'Lounge',
+      label: 'Lounge & Vibes',
       links: [
+        { id: 'viberooms' as ViewTab, label: 'Shared Vibe Rooms', icon: Flame, color: '#EC4899' },
         { id: 'community' as ViewTab, label: 'Lounge', icon: Users, color: '#F472B6' },
       ],
     },
     {
       label: 'Productivity',
       links: [
+        { id: 'microdrops' as ViewTab, label: 'Micro-Drops & Recaps', icon: Zap, color: '#8B5CF6' },
         { id: 'habits' as ViewTab, label: 'Habits & Streaks', icon: Flame, color: '#F97316' },
         { id: 'notes' as ViewTab, label: 'Notes', icon: FileText, color: '#F59E0B' },
         { id: 'diary' as ViewTab, label: 'Diary & Journal', icon: Book, color: '#A855F7' },
@@ -142,6 +147,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'AI Brain',
       links: [
         { id: 'assistant' as ViewTab, label: 'AI Assistant', icon: Sparkles, color: '#A78BFA' },
+        { id: 'warrooms' as ViewTab, label: 'Multi-Agent War Room', icon: Zap, color: '#F59E0B' },
+        { id: 'simulation' as ViewTab, label: 'Simulation Sandbox', icon: Code2, color: '#38BDF8' },
+        { id: 'fabric' as ViewTab, label: 'Context Fabric', icon: Network, color: '#06B6D4' },
         { id: 'memory' as ViewTab, label: 'AI Memory', icon: Brain, color: '#67E8F9' },
       ],
     },
@@ -179,10 +187,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* Sidebar container */}
+      {/* Sidebar container - stops at bottom-12 above taskbar */}
       <aside
         id="globalSidebar"
-        className={`fixed top-0 bottom-0 left-0 z-50 flex flex-col bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)] transition-all duration-200 ease-in-out ${
+        className={`fixed top-0 bottom-12 left-0 z-50 flex flex-col bg-[var(--color-bg-secondary)] border-r border-[var(--color-border)] transition-all duration-200 ease-in-out ${
           isMobileOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0'
         } ${isCollapsed && !isMobileOpen ? 'lg:w-[72px]' : 'lg:w-[256px]'}`}
       >

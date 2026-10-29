@@ -10,14 +10,19 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // User profile and settings
+    // User profile and private workspace settings (Strict owner access)
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create, update, delete: if isOwner(userId);
+      allow read, create, update, delete: if isOwner(userId);
 
       match /search_history/{historyId} {
         allow read, write: if isOwner(userId);
       }
+    }
+
+    // Public directory profiles for Lounge discovery (Safe public display)
+    match /public_profiles/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId);
     }
 
     // Owner-scoped workspace collections
@@ -29,6 +34,13 @@ service cloud.firestore {
     }
 
     match /notes/{noteId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /diary_entries/{entryId} {
       allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
       allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
@@ -126,16 +138,40 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
+    match /habits/{habitId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /finance_transactions/{txId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    match /vision_board/{visionId} {
+      allow get: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow list: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
     match /system/{docId} {
       allow read: if true;
       allow write: if false;
     }
 
-    // Community The Lounge collections
+    // Community / Lounge Collections
     match /community_posts/{postId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'commentsCount', 'savedBy', 'upvotes']));
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount', 'likedBy', 'commentsCount', 'savedBy', 'upvotes'])
+      );
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
@@ -145,10 +181,10 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
+    // Community Channels: Protected from unauthorized tampering; read-only for users
     match /community_channels/{channelId} {
       allow read: if true;
-      allow create, update: if isAuthenticated();
-      allow delete: if false;
+      allow write: if false;
     }
 
     match /community_messages/{messageId} {
@@ -157,10 +193,11 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
+    // Direct Chat Threads: Only accessible by thread participants
     match /community_threads/{threadId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      allow read: if isAuthenticated() && (resource == null || request.auth.uid in resource.data.participants);
+      allow create: if isAuthenticated() && (request.auth.uid in request.resource.data.participants);
+      allow update: if isAuthenticated() && (request.auth.uid in resource.data.participants);
       allow delete: if isAuthenticated() && resource.data.createdBy == request.auth.uid;
     }
 
@@ -170,16 +207,23 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && (resource.data.senderId == request.auth.uid || resource.data.userId == request.auth.uid);
     }
 
+    // 24-Hour Ephemeral Stories: Publicly readable; owner-writable
     match /community_stories/{storyId} {
       allow read: if true;
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
     match /community_follows/{followId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && request.resource.data.followerId == request.auth.uid;
       allow delete: if isAuthenticated() && resource.data.followerId == request.auth.uid;
+    }
+
+    // Verified Subscriptions: Read-only for owner; server-only writes
+    match /subscriptions/{subId} {
+      allow read: if isAuthenticated() && (isOwner(subId) || resource.data.userId == request.auth.uid);
+      allow write: if false;
     }
 
     match /schema_migrations/{migrationId} {

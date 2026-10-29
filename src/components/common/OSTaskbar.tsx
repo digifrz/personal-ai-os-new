@@ -23,8 +23,24 @@ import {
   Sun,
   Waves,
   Dices,
+  Zap,
+  Code2,
+  Brain,
+  Video,
+  Mic,
+  Palette,
+  Terminal,
+  User as UserIcon,
+  LogOut,
+  Settings,
+  Shield,
+  Briefcase,
+  ChevronDown,
+  Crown,
 } from 'lucide-react';
 import { useWindowManager } from '../../context/WindowManagerContext';
+import { useAuth } from '../../context/AuthContext';
+import { dynamicSoundtrack } from '../../services/soundtrack.service';
 
 export interface OSTaskbarProps {
   onOpenAppHub?: () => void;
@@ -41,6 +57,19 @@ export interface OSTaskbarProps {
   onOpenRoastHype?: () => void;
   onOpenDecisionWheel?: () => void;
   onOpenSoundscape?: () => void;
+  onOpenWarRooms?: () => void;
+  onOpenSimulation?: () => void;
+  onOpenContextFabric?: () => void;
+  onOpenSmartVideo?: () => void;
+  onOpenAmbientVoice?: () => void;
+  onOpenVibeRooms?: () => void;
+  onOpenQuickDrop?: () => void;
+  onOpenProfile?: () => void;
+  onOpenAccountsCenter?: () => void;
+  onOpenSettings?: () => void;
+  onOpenThemes?: () => void;
+  onOpenGhostWriter?: () => void;
+  onOpenPayments?: () => void;
 }
 
 export const OSTaskbar: React.FC<OSTaskbarProps> = ({
@@ -58,7 +87,21 @@ export const OSTaskbar: React.FC<OSTaskbarProps> = ({
   onOpenRoastHype,
   onOpenDecisionWheel,
   onOpenSoundscape,
+  onOpenWarRooms,
+  onOpenSimulation,
+  onOpenContextFabric,
+  onOpenSmartVideo,
+  onOpenAmbientVoice,
+  onOpenVibeRooms,
+  onOpenQuickDrop,
+  onOpenProfile,
+  onOpenAccountsCenter,
+  onOpenSettings,
+  onOpenThemes,
+  onOpenGhostWriter,
+  onOpenPayments,
 }) => {
+  const { user, profile, logout, isPro, accountType } = useAuth();
   const {
     windows,
     activeWindowId,
@@ -74,6 +117,16 @@ export const OSTaskbar: React.FC<OSTaskbarProps> = ({
   const [timeStr, setTimeStr] = useState('');
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isLauncherOpen, setIsLauncherOpen] = useState(false);
+  const [isProfileFlyoutOpen, setIsProfileFlyoutOpen] = useState(false);
+  const [soundtrackPlaying, setSoundtrackPlaying] = useState(false);
+
+  useEffect(() => {
+    const handleSoundState = (e: any) => {
+      setSoundtrackPlaying(e.detail?.isPlaying || false);
+    };
+    window.addEventListener('paio:soundtrack-state', handleSoundState);
+    return () => window.removeEventListener('paio:soundtrack-state', handleSoundState);
+  }, []);
 
   useEffect(() => {
     const updateTime = () => {
@@ -252,6 +305,83 @@ export const OSTaskbar: React.FC<OSTaskbarProps> = ({
               <Waves className="w-4 h-4" />
             </button>
           )}
+
+          {onOpenWarRooms && (
+            <button
+              type="button"
+              onClick={onOpenWarRooms}
+              title="Multi-Agent War Room"
+              className="p-1.5 rounded-lg hover:bg-amber-500/20 text-amber-400 transition-colors"
+            >
+              <Zap className="w-4 h-4" />
+            </button>
+          )}
+
+          {onOpenSimulation && (
+            <button
+              type="button"
+              onClick={onOpenSimulation}
+              title="Interactive Simulation Sandbox"
+              className="p-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-400 transition-colors"
+            >
+              <Code2 className="w-4 h-4" />
+            </button>
+          )}
+
+          {onOpenContextFabric && (
+            <button
+              type="button"
+              onClick={onOpenContextFabric}
+              title="Unified Context Fabric HUD"
+              className="p-1.5 rounded-lg hover:bg-cyan-500/20 text-cyan-300 transition-colors"
+            >
+              <Brain className="w-4 h-4" />
+            </button>
+          )}
+
+          {onOpenSmartVideo && (
+            <button
+              type="button"
+              onClick={onOpenSmartVideo}
+              title="Smart Interactive Video Studio"
+              className="p-1.5 rounded-lg hover:bg-indigo-500/20 text-indigo-400 transition-colors"
+            >
+              <Video className="w-4 h-4" />
+            </button>
+          )}
+
+          {onOpenAmbientVoice && (
+            <button
+              type="button"
+              onClick={onOpenAmbientVoice}
+              title="Ambient Interruptible Voice Stream"
+              className="p-1.5 rounded-lg hover:bg-pink-500/20 text-pink-400 transition-colors"
+            >
+              <Mic className="w-4 h-4" />
+            </button>
+          )}
+
+          {onOpenVibeRooms && (
+            <button
+              type="button"
+              onClick={onOpenVibeRooms}
+              title="Shared Vibe Rooms (Co-Working Watch Party)"
+              className="p-1.5 rounded-lg hover:bg-pink-500/20 text-pink-400 transition-colors"
+            >
+              <Flame className="w-4 h-4" />
+            </button>
+          )}
+
+          {onOpenQuickDrop && (
+            <button
+              type="button"
+              onClick={onOpenQuickDrop}
+              title="Zero-Friction Micro-Drop"
+              className="p-1.5 rounded-lg hover:bg-purple-500/20 text-purple-400 transition-colors"
+            >
+              <Zap className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -298,31 +428,240 @@ export const OSTaskbar: React.FC<OSTaskbarProps> = ({
         })}
       </div>
 
-      {/* Right: Cloud Sync Status & Digital Clock */}
-      <div className="flex items-center gap-2.5 shrink-0 text-xs">
+      {/* Right: Soundtracks, Themes, Cloud Sync, Clock & USER PROFILE */}
+      <div className="flex items-center gap-2 shrink-0 text-xs">
+        {/* Dynamic Room Soundtrack Quick Toggle */}
+        <button
+          type="button"
+          onClick={() => {
+            const isNowPlaying = dynamicSoundtrack.togglePlay();
+            setSoundtrackPlaying(isNowPlaying);
+          }}
+          title={soundtrackPlaying ? "Dynamic Room Soundtrack: Playing (Click to Pause)" : "Dynamic Room Soundtrack: Paused (Click to Play)"}
+          className={`hidden md:flex items-center gap-1.5 rounded-xl border px-2 py-1 text-[11px] font-bold transition-all ${
+            soundtrackPlaying
+              ? 'border-pink-500/50 bg-pink-500/15 text-pink-300 shadow-sm animate-pulse'
+              : 'border-[var(--color-border)] hover:bg-[var(--color-bg-secondary)] text-[var(--color-muted)] hover:text-[var(--color-text)]'
+          }`}
+        >
+          <Waves className="w-3.5 h-3.5" />
+          <span className="hidden xl:inline">{soundtrackPlaying ? 'LoFi On' : 'LoFi'}</span>
+        </button>
+
+        {/* Visual Skins / Hacker Themes Switcher */}
+        {onOpenThemes && (
+          <button
+            type="button"
+            onClick={onOpenThemes}
+            title="Visual Skins & Aesthetic Themes (Cyberpunk, Terminal Green, Synthwave)"
+            className="hidden sm:flex p-1.5 rounded-xl border border-[var(--color-border)] hover:border-cyan-500/50 hover:bg-cyan-500/10 text-cyan-400 transition-all"
+          >
+            <Palette className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        {/* Ghost-Writer Terminal Co-Pilot */}
+        {onOpenGhostWriter && (
+          <button
+            type="button"
+            onClick={onOpenGhostWriter}
+            title="AI Ghost-Writer Terminal & Chat Co-Pilot"
+            className="p-1.5 rounded-xl border border-purple-500/40 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 transition-all"
+          >
+            <Terminal className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         {/* Cloud Firestore Live Sync Status */}
         <div
           title={isOnline ? 'Cloud Firestore live sync active with IndexedDB offline cache' : 'Offline mode active. Changes queued in local cache.'}
-          className="hidden sm:flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2.5 py-1 text-[11px] font-bold"
+          className="hidden lg:flex items-center gap-1.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-secondary)] px-2.5 py-1 text-[11px] font-bold"
         >
           {isOnline ? (
             <>
               <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-              <span className="text-emerald-400">Cloud Synced</span>
+              <span className="text-emerald-400">Synced</span>
             </>
           ) : (
             <>
               <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-              <span className="text-amber-400">Offline Cache</span>
+              <span className="text-amber-400">Offline</span>
             </>
           )}
         </div>
 
         {/* Digital Clock */}
-        <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-[var(--color-text)] px-1">
+        <div className="hidden sm:flex items-center gap-1 font-mono text-[11px] font-bold text-[var(--color-text)] px-1">
           <Clock className="w-3.5 h-3.5 text-[var(--color-muted)]" />
           <span>{timeStr}</span>
         </div>
+
+        <div className="h-4 w-[1px] bg-[var(--color-border)] mx-0.5 hidden sm:block" />
+
+        {/* ========================================================= */}
+        {/* USER PROFILE AVATAR & QUICK OS MENU */}
+        {/* ========================================================= */}
+        {user ? (
+          <div className="relative">
+            <button
+              type="button"
+              id="taskbar-user-profile-button"
+              onClick={() => setIsProfileFlyoutOpen(!isProfileFlyoutOpen)}
+              title={`Logged in as ${profile?.name || user.email}`}
+              className="flex items-center gap-1.5 rounded-full border border-[var(--color-border)] hover:border-purple-500 bg-[var(--color-surface)] p-0.5 pr-2 transition-all hover:scale-105 shadow-sm cursor-pointer"
+            >
+              {profile?.avatarUrl ? (
+                <img
+                  src={profile.avatarUrl}
+                  alt={profile.name || 'User'}
+                  className="h-6 w-6 rounded-full object-cover border border-purple-500/40"
+                />
+              ) : (
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 text-[10px] font-extrabold text-white">
+                  {(profile?.name || user.email || 'U')[0].toUpperCase()}
+                </div>
+              )}
+              <span className="hidden md:inline text-[11px] font-extrabold text-[var(--color-text)] max-w-[80px] truncate">
+                {profile?.name?.split(' ')[0] || user.email?.split('@')[0] || 'User'}
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+            </button>
+
+            {/* Profile Flyout Dropdown Menu */}
+            {isProfileFlyoutOpen && (
+              <>
+                <div
+                  onClick={() => setIsProfileFlyoutOpen(false)}
+                  className="fixed inset-0 z-40"
+                />
+                <div className="absolute bottom-14 right-0 z-50 w-72 rounded-3xl border border-white/10 bg-zinc-950/90 p-4 shadow-2xl backdrop-blur-2xl space-y-3 animate-fade-in text-xs text-white">
+                  {/* User Profile Card */}
+                  <div className="flex items-center gap-3 pb-3 border-b border-white/10">
+                    {profile?.avatarUrl ? (
+                      <img
+                        src={profile.avatarUrl}
+                        alt="Avatar"
+                        className="h-10 w-10 rounded-full object-cover border-2 border-purple-500/40"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 text-sm font-black text-white shadow">
+                        {(profile?.name || user.email || 'U')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <strong className="block text-xs font-black truncate text-white">
+                          {profile?.name || 'Workspace Member'}
+                        </strong>
+                        <span className="rounded bg-purple-500/20 px-1 py-0.2 text-[9px] font-black text-purple-300">
+                          {isPro ? 'PRO' : 'FREE'}
+                        </span>
+                      </div>
+                      <span className="block text-[10px] text-zinc-400 truncate">
+                        {user.email}
+                      </span>
+                      <span className="text-[9px] text-cyan-400 font-semibold">
+                        {accountType === 'business' ? '💼 Professional Creator' : '👤 Personal Workspace'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="space-y-1">
+                    {onOpenProfile && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileFlyoutOpen(false);
+                          onOpenProfile();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 font-bold text-zinc-300 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <UserIcon className="w-4 h-4 text-pink-400" />
+                        <span>View Lounge Profile</span>
+                      </button>
+                    )}
+
+                    {onOpenAccountsCenter && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileFlyoutOpen(false);
+                          onOpenAccountsCenter();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 font-bold text-zinc-300 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <Briefcase className="w-4 h-4 text-purple-400" />
+                        <span>Lounge Accounts Center &amp; Tools</span>
+                      </button>
+                    )}
+
+                    {onOpenThemes && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileFlyoutOpen(false);
+                          onOpenThemes();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 font-bold text-zinc-300 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <Palette className="w-4 h-4 text-cyan-400" />
+                        <span>Visual Skins &amp; Soundtracks</span>
+                      </button>
+                    )}
+
+                    {onOpenPayments && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileFlyoutOpen(false);
+                          onOpenPayments();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 font-bold text-amber-300 hover:text-white hover:bg-amber-500/15 transition-colors"
+                      >
+                        <Crown className="w-4 h-4 text-amber-400" />
+                        <span>Payment Options &amp; Pro Plans</span>
+                      </button>
+                    )}
+
+                    {onOpenSettings && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsProfileFlyoutOpen(false);
+                          onOpenSettings();
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 font-bold text-zinc-300 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <Settings className="w-4 h-4 text-zinc-400" />
+                        <span>Workspace Settings &amp; Data</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sign Out */}
+                  <div className="pt-2 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileFlyoutOpen(false);
+                        logout();
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 font-bold text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-zinc-400">Guest</span>
+          </div>
+        )}
       </div>
 
       {/* Launcher Flyout Menu */}
